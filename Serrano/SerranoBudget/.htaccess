@@ -1,0 +1,5 @@
+AuthType Basic
+AuthName "Access to /Serrano/SerranoBudget"
+AuthUserFile /kunden/homepages/40/d364780999/htpasswd
+Require user monicas
+Require user serrano88
