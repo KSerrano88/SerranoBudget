@@ -14,12 +14,14 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 CREATE TABLE IF NOT EXISTS balance_carryover (
+    ID_CARRYOVER SERIAL PRIMARY KEY,
+    ENTRY_DATE DATE,
     AMOUNT DECIMAL(10,2),
     IS_ACTIVE SMALLINT DEFAULT 0
 );
 
 -- Carryover balance
-INSERT INTO balance_carryover (AMOUNT, IS_ACTIVE) VALUES (2450.00, 1);
+INSERT INTO balance_carryover (ENTRY_DATE, AMOUNT, IS_ACTIVE) VALUES ('2010-02-28', 168.18, 1);
 
 -- ==========================================
 -- Realistic seed data: Oct 2025 - Feb 2026
