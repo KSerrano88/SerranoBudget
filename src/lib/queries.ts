@@ -290,8 +290,8 @@ export async function getMonthlyTotals() {
         month: curMonth,
         year: curYear,
         monthName,
-        debits: debitResult.rows,
-        credits: creditResult.rows,
+        debits: debitResult.rows as unknown as Array<{ TRAN_TYPE: string; SUM_DEBIT: number }>,
+        credits: creditResult.rows as unknown as Array<{ TRAN_TYPE: string; SUM_CREDIT: number }>,
       });
     }
 
