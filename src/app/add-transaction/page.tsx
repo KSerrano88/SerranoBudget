@@ -77,7 +77,8 @@ export default function AddTransactionPage() {
       toast.success("Transaction added");
       router.push("/balance-sheet");
     } else {
-      toast.error("Failed to add transaction");
+      const data = await res.json().catch(() => null);
+      toast.error(data?.error || "Failed to add transaction");
     }
   }
 

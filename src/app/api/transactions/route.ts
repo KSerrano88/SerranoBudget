@@ -17,17 +17,25 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const id = await createTransaction({
-    TRANSACTION_DATE: body.TRANSACTION_DATE,
-    CHECK_NMBR: body.CHECK_NMBR || "",
-    DESCRIPTION: body.DESCRIPTION,
-    NOTES: body.NOTES || "",
-    MULTI_PART_TRAN_TOTAL: body.MULTI_PART_TRAN_TOTAL || 0,
-    POSTED_FLAG: body.POSTED_FLAG || 0,
-    TRAN_TYPE: body.TRAN_TYPE,
-    DEBIT: body.DEBIT || 0,
-    CREDIT: body.CREDIT || 0,
-  });
-  return NextResponse.json({ id }, { status: 201 });
+  try {
+    const body = await request.json();
+    const id = await createTransaction({
+      TRANSACTION_DATE: body.TRANSACTION_DATE,
+      CHECK_NMBR: body.CHECK_NMBR || "",
+      DESCRIPTION: body.DESCRIPTION,
+      NOTES: body.NOTES || "",
+      MULTI_PART_TRAN_TOTAL: body.MULTI_PART_TRAN_TOTAL || 0,
+      POSTED_FLAG: body.POSTED_FLAG || 0,
+      TRAN_TYPE: body.TRAN_TYPE,
+      DEBIT: body.DEBIT || 0,
+      CREDIT: body.CREDIT || 0,
+    });
+    return NextResponse.json({ id }, { status: 201 });
+  } catch (error) {
+    console.error("Create transaction error:", error);
+    return NextResponse.json(
+      { error: String(error) },
+      { status: 500 }
+    );
+  }
 }
