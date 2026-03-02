@@ -22,6 +22,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   AlertDialog,
@@ -61,6 +62,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
 
   async function handleDeleteLast() {
     const res = await fetch("/api/transactions/last", { method: "DELETE" });
@@ -99,7 +101,7 @@ export function AppSidebar() {
                     isActive={pathname === item.href}
                     className="py-3 text-[14px] font-bold border-t border-[#00094D] border-b border-b-[#1A2876]"
                   >
-                    <Link href={item.href}>
+                    <Link href={item.href} onClick={() => setOpenMobile(false)}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
