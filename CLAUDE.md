@@ -4,7 +4,8 @@ Read `AGENTS.md` for full project context, architecture, and conventions.
 
 ## Quick Reference
 - **Stack:** Next.js 16 + React 19 + PostgreSQL + NextAuth v5 + shadcn/ui + Tailwind CSS
-- **Local dev:** `docker compose up -d` then `npm run dev`
+- **Local dev:** `colima start` then `docker compose up -d` then `npm run dev`
+- **Environment:** Copy `.env.example` to `.env` if `.env` doesn't exist (`cp .env.example .env`)
 - **Database:** PostgreSQL 16 (local Docker), Neon PostgreSQL (production)
 - **Deployment:** Vercel (auto-deploys from `main` branch)
 - **Auth:** Single-user credentials from env vars (`APP_USERNAME`, `APP_PASSWORD`)

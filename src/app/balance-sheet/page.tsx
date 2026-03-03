@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Transaction } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { SummaryBar } from "@/components/summary-bar";
@@ -166,12 +166,19 @@ export default function BalanceSheetPage() {
     }
   }
 
-  function handleRefresh() {
-    const days = Number(numDaysInput);
-    if (days > 0) {
-      setNumDays(days);
-    }
-  }
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const days = Number(numDaysInput);
+      if (days > 0) {
+        setNumDays(days);
+      }
+    }, 600);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [numDaysInput]);
 
   const today = new Date().toISOString().split("T")[0];
   const startDate = new Date();
@@ -181,15 +188,15 @@ export default function BalanceSheetPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Balance Sheet</h1>
-          <p className="text-sm text-muted-foreground">
-            {postStatus === "unposted"
-              ? "Showing all unposted transactions"
-              : `${formatDate(startDateStr)} — ${formatDate(today)}`}
-          </p>
-        </div>
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-6">
+          <div>
+            <h1 className="text-2xl font-bold">Balance Sheet</h1>
+            <p className="text-sm text-muted-foreground">
+              {postStatus === "unposted"
+                ? "Showing all unposted transactions"
+                : `${formatDate(startDateStr)} — ${formatDate(today)}`}
+            </p>
+          </div>
           <div>
             <Label htmlFor="numDays" className="text-xs">
               Prior Days
@@ -199,35 +206,8 @@ export default function BalanceSheetPage() {
               type="number"
               value={numDaysInput}
               onChange={(e) => setNumDaysInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleRefresh()}
               className="w-20"
             />
-          </div>
-          <Button onClick={handleRefresh} variant="outline">
-            Refresh
-          </Button>
-          <div className="flex gap-1">
-            <Button
-              variant={postStatus === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPostStatus("all")}
-            >
-              All
-            </Button>
-            <Button
-              variant={postStatus === "posted" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPostStatus("posted")}
-            >
-              Posted
-            </Button>
-            <Button
-              variant={postStatus === "unposted" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPostStatus("unposted")}
-            >
-              Unposted
-            </Button>
           </div>
         </div>
       </div>
@@ -243,51 +223,79 @@ export default function BalanceSheetPage() {
         />
       )}
 
-      <div className="flex gap-2">
-        {!editing && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={selectedIds.size === 0}
-              onClick={handleEditSelected}
-            >
-              Edit Selected
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={selectedIds.size === 0}
-              onClick={() => setDeleteDialogOpen(true)}
-            >
-              Delete Selected
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDeleteLastDialogOpen(true)}
-            >
-              Delete Last Transaction
-            </Button>
-          </>
-        )}
-        {editing && (
-          <>
-            <Button size="sm" onClick={handleUpdateSelected}>
-              Save Changes
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setEditing(false);
-                setEditData({});
-              }}
-            >
-              Cancel
-            </Button>
-          </>
-        )}
+      <div className="flex flex-col gap-2">
+        <div className="flex gap-1">
+          <Button
+            variant={postStatus === "all" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setPostStatus("all")}
+          >
+            All
+          </Button>
+          <Button
+            variant={postStatus === "posted" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setPostStatus("posted")}
+          >
+            Posted
+          </Button>
+          <Button
+            variant={postStatus === "unposted" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setPostStatus("unposted")}
+          >
+            Unposted
+          </Button>
+        </div>
+
+        <div className="flex gap-2">
+          {!editing && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={selectedIds.size === 0}
+                onClick={handleEditSelected}
+              >
+                Edit Selected
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={selectedIds.size === 0}
+                onClick={() => setDeleteDialogOpen(true)}
+                className="text-destructive"
+              >
+                Delete Selected
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeleteLastDialogOpen(true)}
+                className="text-destructive"
+              >
+                Delete Last Transaction
+              </Button>
+            </>
+          )}
+          {editing && (
+            <>
+              <Button size="sm" onClick={handleUpdateSelected}>
+                Save Changes
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditing(false);
+                  setEditData({});
+                }}
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {loading ? (
