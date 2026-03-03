@@ -13,7 +13,7 @@ Personal budgeting web app. Originally a PHP LAMP-stack application (~2011), ful
 | Toasts | Sonner |
 | Hosting | Vercel (free tier) |
 | Database hosting | Neon PostgreSQL (free tier) |
-| Local dev DB | Docker (postgres:16-alpine) |
+| Local dev DB | Docker (postgres:16-alpine) via Colima |
 
 ## Environment Variables
 | Variable | Purpose |
@@ -194,17 +194,36 @@ interface MonthlyRollup {
 
 ## Local Development
 
+### Prerequisites
+- **Colima** — lightweight Docker runtime for macOS (no Docker Desktop needed)
+- **docker-compose** — installed via Homebrew as a Docker CLI plugin
+
+### Docker / Colima Setup
+Colima provides the Docker daemon. The `docker-compose` Homebrew formula installs as a CLI plugin. The Docker config at `~/.docker/config.json` must include the plugin path:
+```json
+{
+  "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]
+}
+```
+
+### Starting the Environment
 ```bash
-# Start PostgreSQL (requires Docker / Colima)
+# 1. Start Colima (Docker runtime)
+colima start
+
+# 2. Start PostgreSQL container
 docker compose up -d
 
-# Install dependencies
+# 3. Install dependencies
 npm install
 
-# Run dev server
+# 4. Create .env.local from template (first time only)
+cp .env.example .env.local
+# Then edit APP_USERNAME, APP_PASSWORD, and NEXTAUTH_SECRET
+
+# 5. Run dev server
 npm run dev
 # → http://localhost:3000
-# → Login: admin / admin (from .env.local)
 ```
 
 The `init.sql` file seeds the database with realistic transactions from Oct 2025 - Feb 2026 on first container start.
