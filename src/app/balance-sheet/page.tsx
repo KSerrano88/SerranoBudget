@@ -47,7 +47,6 @@ export default function BalanceSheetPage() {
     Record<number, Partial<Transaction>>
   >({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteLastDialogOpen, setDeleteLastDialogOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -156,17 +155,6 @@ export default function BalanceSheetPage() {
     }
   }
 
-  async function handleDeleteLast() {
-    const res = await fetch("/api/transactions/last", { method: "DELETE" });
-    if (res.ok) {
-      toast.success("Last transaction deleted");
-      setDeleteLastDialogOpen(false);
-      fetchData();
-    } else {
-      toast.error("Failed to delete last transaction");
-    }
-  }
-
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -269,14 +257,6 @@ export default function BalanceSheetPage() {
                   >
                     Delete Selected
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDeleteLastDialogOpen(true)}
-                    className="text-destructive"
-                  >
-                    Delete Last Transaction
-                  </Button>
                 </>
               )}
               {editing && (
@@ -340,26 +320,6 @@ export default function BalanceSheetPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={deleteLastDialogOpen}
-        onOpenChange={setDeleteLastDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Last Transaction</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the most recently added
-              transaction? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteLast}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
