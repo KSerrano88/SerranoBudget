@@ -8,6 +8,7 @@ import { TransactionTable } from "@/components/transaction-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -187,18 +188,11 @@ export default function BalanceSheetPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="flex items-end gap-6">
-          <div>
-            <h1 className="text-2xl font-bold">Balance Sheet</h1>
-            <p className="text-sm text-muted-foreground">
-              {postStatus === "unposted"
-                ? "Showing all unposted transactions"
-                : `${formatDate(startDateStr)} — ${formatDate(today)}`}
-            </p>
-          </div>
-          <div>
-            <Label htmlFor="numDays" className="text-xs">
+      <div>
+        <h1 className="text-2xl font-bold">Balance Sheet</h1>
+        <div className="flex items-end gap-4 mt-2">
+          <div className="flex flex-col items-center">
+            <Label htmlFor="numDays" className="text-xs text-muted-foreground">
               Prior Days
             </Label>
             <Input
@@ -206,116 +200,127 @@ export default function BalanceSheetPage() {
               type="number"
               value={numDaysInput}
               onChange={(e) => setNumDaysInput(e.target.value)}
-              className="w-20"
+              className="w-14 h-7 bg-white text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
+          <p className="text-[13px] text-muted-foreground mb-[6px]">
+            {postStatus === "unposted"
+              ? "Showing all unposted transactions"
+              : `${formatDate(startDateStr)} — ${formatDate(today)}`}
+          </p>
         </div>
       </div>
 
-      {summary && (
-        <SummaryBar
-          sumDebit={summary.rangeSummary?.SUM_DEBIT || 0}
-          sumCredit={summary.rangeSummary?.SUM_CREDIT || 0}
-          difference={summary.rangeSummary?.DIFFERENCE || 0}
-          postedBalance={summary.postedBalance?.TOTAL_POSTED_BAL}
-          totalBalance={summary.totalBalance?.TOTAL_BAL}
-          carryOver={summary.carryOver?.CARRYOVER_AMOUNT}
-        />
-      )}
-
-      <div className="flex flex-col gap-2">
-        <div className="flex gap-1">
-          <Button
-            variant={postStatus === "all" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setPostStatus("all")}
-          >
-            All
-          </Button>
-          <Button
-            variant={postStatus === "posted" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setPostStatus("posted")}
-          >
-            Posted
-          </Button>
-          <Button
-            variant={postStatus === "unposted" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setPostStatus("unposted")}
-          >
-            Unposted
-          </Button>
-        </div>
-
-        <div className="flex gap-2">
-          {!editing && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={selectedIds.size === 0}
-                onClick={handleEditSelected}
-              >
-                Edit Selected
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={selectedIds.size === 0}
-                onClick={() => setDeleteDialogOpen(true)}
-                className="text-destructive"
-              >
-                Delete Selected
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setDeleteLastDialogOpen(true)}
-                className="text-destructive"
-              >
-                Delete Last Transaction
-              </Button>
-            </>
+      <Card>
+        <CardContent className="space-y-6">
+          {summary && (
+            <SummaryBar
+              sumDebit={summary.rangeSummary?.SUM_DEBIT || 0}
+              sumCredit={summary.rangeSummary?.SUM_CREDIT || 0}
+              difference={summary.rangeSummary?.DIFFERENCE || 0}
+              postedBalance={summary.postedBalance?.TOTAL_POSTED_BAL}
+              totalBalance={summary.totalBalance?.TOTAL_BAL}
+              carryOver={summary.carryOver?.CARRYOVER_AMOUNT}
+            />
           )}
-          {editing && (
-            <>
-              <Button size="sm" onClick={handleUpdateSelected}>
-                Save Changes
+
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <Button
+                variant={postStatus === "all" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPostStatus("all")}
+              >
+                All
               </Button>
               <Button
-                variant="outline"
+                variant={postStatus === "posted" ? "default" : "outline"}
                 size="sm"
-                onClick={() => {
-                  setEditing(false);
-                  setEditData({});
-                }}
+                onClick={() => setPostStatus("posted")}
               >
-                Cancel
+                Posted
               </Button>
-            </>
-          )}
-        </div>
-      </div>
+              <Button
+                variant={postStatus === "unposted" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setPostStatus("unposted")}
+              >
+                Unposted
+              </Button>
+            </div>
 
-      {loading ? (
-        <p className="text-muted-foreground">Loading transactions...</p>
-      ) : (
-        <TransactionTable
-          transactions={
-            editing
-              ? transactions.filter((t) => selectedIds.has(t.ID_TRANSACTIONS))
-              : transactions
-          }
-          selectable={!editing}
-          selectedIds={selectedIds}
-          onToggleSelect={handleToggleSelect}
-          onToggleSelectAll={handleToggleSelectAll}
-          editable={editing}
-          editData={editData}
-          onEditChange={handleEditChange}
-        />
-      )}
+            <div className="flex gap-2">
+              {!editing && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={handleEditSelected}
+                  >
+                    Edit Selected
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => setDeleteDialogOpen(true)}
+                    className="text-destructive"
+                  >
+                    Delete Selected
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDeleteLastDialogOpen(true)}
+                    className="text-destructive"
+                  >
+                    Delete Last Transaction
+                  </Button>
+                </>
+              )}
+              {editing && (
+                <>
+                  <Button size="sm" onClick={handleUpdateSelected}>
+                    Save Changes
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditing(false);
+                      setEditData({});
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {loading ? (
+            <p className="text-muted-foreground">Loading transactions...</p>
+          ) : (
+            <TransactionTable
+              transactions={
+                editing
+                  ? transactions.filter((t) =>
+                      selectedIds.has(t.ID_TRANSACTIONS)
+                    )
+                  : transactions
+              }
+              selectable={!editing}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onToggleSelectAll={handleToggleSelectAll}
+              editable={editing}
+              editData={editData}
+              onEditChange={handleEditChange}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
