@@ -1,20 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { MobileNav } from "@/components/mobile-nav";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { auth } from "@/lib/auth";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -33,7 +29,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} antialiased`}
       >
         <SessionProvider session={session}>
           <TooltipProvider>
@@ -41,10 +37,7 @@ export default async function RootLayout({
               <SidebarProvider>
                 <AppSidebar />
                 <SidebarInset>
-                  <header className="flex md:hidden h-14 shrink-0 items-center gap-2 border-b bg-white px-4">
-                    <SidebarTrigger className="size-9" />
-                    <span className="text-sm font-semibold">Serrano Budget</span>
-                  </header>
+                  <MobileNav />
                   <div className="flex-1 p-6">{children}</div>
                 </SidebarInset>
               </SidebarProvider>

@@ -207,8 +207,10 @@ Colima provides the Docker daemon. The `docker-compose` Homebrew formula install
 ```
 
 ### Starting the Environment
+**Important:** Always start Colima first — it provides the Docker daemon on macOS. Docker commands will fail without it.
+
 ```bash
-# 1. Start Colima (Docker runtime)
+# 1. Start Colima (Docker runtime) — REQUIRED before any docker commands
 colima start
 
 # 2. Start PostgreSQL container
@@ -217,8 +219,8 @@ docker compose up -d
 # 3. Install dependencies
 npm install
 
-# 4. Create .env.local from template (first time only)
-cp .env.example .env.local
+# 4. Create .env from template (first time only)
+cp .env.example .env
 # Then edit APP_USERNAME, APP_PASSWORD, and NEXTAUTH_SECRET
 
 # 5. Run dev server

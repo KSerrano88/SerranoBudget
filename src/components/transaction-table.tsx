@@ -3,8 +3,9 @@
 import { Transaction } from "@/lib/types";
 import { formatCurrency, formatDate, toInputDate } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { CheckCircle2, Circle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -39,6 +40,9 @@ export function TransactionTable({
     transactions.length > 0 &&
     selectedIds?.size === transactions.length;
 
+  // Hide secondary columns on mobile in view mode, but show all columns in edit mode
+  const hideOnMobile = editable ? "" : "hidden md:table-cell";
+
   return (
     <div className="rounded-md border overflow-x-auto">
       <Table>
@@ -53,12 +57,12 @@ export function TransactionTable({
               </TableHead>
             )}
             <TableHead>Date</TableHead>
-            <TableHead>Check #</TableHead>
+            <TableHead className="text-center">Posted</TableHead>
+            <TableHead className={hideOnMobile}>Check #</TableHead>
             <TableHead>Description</TableHead>
-            <TableHead>Notes</TableHead>
-            <TableHead>Multi-Part</TableHead>
-            <TableHead>Posted</TableHead>
-            <TableHead>Type</TableHead>
+            <TableHead className={hideOnMobile}>Notes</TableHead>
+            <TableHead className={hideOnMobile}>Multi-Part</TableHead>
+            <TableHead className={hideOnMobile}>Type</TableHead>
             <TableHead className="text-right">Debit</TableHead>
             <TableHead className="text-right">Credit</TableHead>
           </TableRow>
@@ -111,7 +115,36 @@ export function TransactionTable({
                       formatDate(data.TRANSACTION_DATE)
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="text-center">
+                    {isEditing ? (
+                      <Checkbox
+                        checked={data.POSTED_FLAG === 1}
+                        onCheckedChange={(checked) =>
+                          onEditChange?.(
+                            t.ID_TRANSACTIONS,
+                            "POSTED_FLAG",
+                            checked ? 1 : 0
+                          )
+                        }
+                      />
+                    ) : (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex justify-center">
+                            {data.POSTED_FLAG === 1 ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {data.POSTED_FLAG === 1 ? "Posted" : "Unposted"}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                  <TableCell className={hideOnMobile}>
                     {isEditing ? (
                       <Input
                         value={data.CHECK_NMBR || ""}
@@ -146,7 +179,7 @@ export function TransactionTable({
                       data.DESCRIPTION
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={hideOnMobile}>
                     {isEditing ? (
                       <Input
                         value={data.NOTES || ""}
@@ -164,7 +197,7 @@ export function TransactionTable({
                       data.NOTES || ""
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={hideOnMobile}>
                     {isEditing ? (
                       <Input
                         type="number"
@@ -185,29 +218,7 @@ export function TransactionTable({
                       ""
                     )}
                   </TableCell>
-                  <TableCell>
-                    {isEditing ? (
-                      <Checkbox
-                        checked={data.POSTED_FLAG === 1}
-                        onCheckedChange={(checked) =>
-                          onEditChange?.(
-                            t.ID_TRANSACTIONS,
-                            "POSTED_FLAG",
-                            checked ? 1 : 0
-                          )
-                        }
-                      />
-                    ) : (
-                      <Badge
-                        variant={
-                          data.POSTED_FLAG === 1 ? "default" : "secondary"
-                        }
-                      >
-                        {data.POSTED_FLAG === 1 ? "Posted" : "Unposted"}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
+                  <TableCell className={hideOnMobile}>
                     {isEditing ? (
                       <Input
                         value={data.TRAN_TYPE || ""}
