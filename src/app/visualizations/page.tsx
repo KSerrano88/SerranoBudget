@@ -104,6 +104,60 @@ function CustomTooltip({
   );
 }
 
+function PieLabel({
+  cx,
+  cy,
+  midAngle,
+  outerRadius,
+  name,
+  percent,
+}: {
+  cx?: number;
+  cy?: number;
+  midAngle?: number;
+  outerRadius?: number;
+  name?: string;
+  percent?: number;
+}) {
+  const RADIAN = Math.PI / 180;
+  const radius = (outerRadius || 0) + 24;
+  const x = (cx || 0) + radius * Math.cos(-1 * (midAngle || 0) * RADIAN);
+  const y = (cy || 0) + radius * Math.sin(-1 * (midAngle || 0) * RADIAN);
+  const textAnchor = x > (cx || 0) ? "start" : "end";
+  const label = `${name || ""} ${((percent || 0) * 100).toFixed(0)}%`;
+
+  // Split into words and wrap at ~16 chars per line
+  const words = label.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    if (current && (current + " " + word).length > 16) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = current ? current + " " + word : word;
+    }
+  }
+  if (current) lines.push(current);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      textAnchor={textAnchor}
+      dominantBaseline="central"
+      fontSize={12}
+      fill="#374151"
+    >
+      {lines.map((line, i) => (
+        <tspan key={i} x={x} dy={i === 0 ? 0 : 14}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  );
+}
+
 type ChartView = "bar" | "line" | "pie";
 
 export default function VisualizationsPage() {
@@ -597,9 +651,7 @@ export default function VisualizationsPage() {
                           cx="50%"
                           cy="50%"
                           outerRadius={140}
-                          label={({ name, percent }: { name?: string; percent?: number }) =>
-                            `${name || ""} ${((percent || 0) * 100).toFixed(0)}%`
-                          }
+                          label={PieLabel}
                           labelLine
                         >
                           {pieData
@@ -630,9 +682,7 @@ export default function VisualizationsPage() {
                           cx="50%"
                           cy="50%"
                           outerRadius={140}
-                          label={({ name, percent }: { name?: string; percent?: number }) =>
-                            `${name || ""} ${((percent || 0) * 100).toFixed(0)}%`
-                          }
+                          label={PieLabel}
                           labelLine
                         >
                           {pieData
