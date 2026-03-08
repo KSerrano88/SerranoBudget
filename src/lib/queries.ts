@@ -199,6 +199,19 @@ export async function getTransactionTypes() {
   return rows.map((r: Record<string, unknown>) => r.TRAN_TYPE as string).filter(Boolean);
 }
 
+export async function getTransactionTypesRanked(topN = 10) {
+  const sql = `SELECT TRAN_TYPE, COUNT(*) AS CNT
+               FROM transactions
+               WHERE TRAN_TYPE IS NOT NULL AND TRAN_TYPE <> ''
+               GROUP BY TRAN_TYPE
+               ORDER BY CNT DESC`;
+  const { rows } = await query(sql);
+  const all = rows as Array<{ TRAN_TYPE: string; CNT: string }>;
+  const top = all.slice(0, topN).map((r) => r.TRAN_TYPE);
+  const rest = all.slice(topN).map((r) => r.TRAN_TYPE).sort();
+  return { top, rest };
+}
+
 // ===== TRANSACTION HISTORY =====
 
 export async function getTransactionHistory(params: {

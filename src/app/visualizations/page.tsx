@@ -1,11 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChevronDown, Search, Save } from "lucide-react";
+import { toast } from "sonner";
 import {
   BarChart,
   Bar,
@@ -50,6 +59,51 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function CustomTooltip({
+  active,
+  payload,
+  label,
+  hoveredType,
+  suffix,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; color?: string }>;
+  label?: string;
+  hoveredType: string | null;
+  suffix: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  // Filter out zero values
+  const items = payload.filter((p) => p.value && p.value > 0);
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border bg-white p-3 shadow-md">
+      <p className="mb-2 text-sm font-semibold">{label}</p>
+      {items.map((entry) => {
+        const name = entry.name || "";
+        const isHovered = hoveredType === `${name}${suffix}`;
+        return (
+          <div
+            key={name}
+            className={`flex items-center gap-2 py-0.5 text-sm ${
+              isHovered ? "font-bold" : hoveredType ? "opacity-40" : ""
+            }`}
+          >
+            <span
+              className="inline-block h-3 w-3 rounded-sm"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span>{name}:</span>
+            <span>{formatCurrency(Number(entry.value))}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 type ChartView = "bar" | "line" | "pie";
 
 export default function VisualizationsPage() {
@@ -61,16 +115,41 @@ export default function VisualizationsPage() {
     oneYearAgo.toISOString().split("T")[0]
   );
   const [endDate, setEndDate] = useState(now.toISOString().split("T")[0]);
-  const [allTypes, setAllTypes] = useState<string[]>([]);
+  const [topTypes, setTopTypes] = useState<string[]>([]);
+  const [restTypes, setRestTypes] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
   const [data, setData] = useState<DataRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [chartView, setChartView] = useState<ChartView>("bar");
+  const [typeSearch, setTypeSearch] = useState("");
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [hoveredType, setHoveredType] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const STORAGE_KEY = "viz-default-types";
 
   useEffect(() => {
-    fetch("/api/transactions/types")
+    fetch("/api/transactions/types-ranked")
       .then((r) => r.json())
-      .then((d) => setAllTypes(d.types || []));
+      .then((d) => {
+        const top = d.top || [];
+        const rest = d.rest || [];
+        setTopTypes(top);
+        setRestTypes(rest);
+
+        // Load saved defaults from localStorage, or fall back to top 10
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved) as string[];
+            setSelectedTypes(new Set(parsed));
+          } catch {
+            setSelectedTypes(new Set(top));
+          }
+        } else {
+          setSelectedTypes(new Set(top));
+        }
+      });
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -98,6 +177,8 @@ export default function VisualizationsPage() {
     });
   }
 
+  const allTypes = [...topTypes, ...restTypes];
+
   function selectAll() {
     setSelectedTypes(new Set(allTypes));
   }
@@ -105,6 +186,18 @@ export default function VisualizationsPage() {
   function clearAll() {
     setSelectedTypes(new Set());
   }
+
+  function saveDefaults() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(selectedTypes)));
+    toast.success("Default types saved");
+  }
+
+  const filteredTop = typeSearch
+    ? topTypes.filter((t) => t.toLowerCase().includes(typeSearch.toLowerCase()))
+    : topTypes;
+  const filteredRest = typeSearch
+    ? restTypes.filter((t) => t.toLowerCase().includes(typeSearch.toLowerCase()))
+    : restTypes;
 
   // Build monthly bar/line data: each month has a key per type for debits and credits
   const months = [...new Set(data.map((d) => d.MONTH))].sort();
@@ -167,30 +260,118 @@ export default function VisualizationsPage() {
           </div>
 
           {/* Transaction type selector */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <Label className="text-sm font-semibold">Transaction Types</Label>
-              <Button variant="outline" size="sm" onClick={selectAll}>
-                Select All
-              </Button>
-              <Button variant="outline" size="sm" onClick={clearAll}>
-                Clear
-              </Button>
+          <div className="flex flex-col gap-2 md:flex-row md:items-end">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">
+                Transaction Types
+              </Label>
+              <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-72 justify-between bg-white font-normal"
+                  >
+                    <span className="truncate">
+                      {selectedTypes.size === 0
+                        ? "All types"
+                        : selectedTypes.size === allTypes.length
+                          ? "All types"
+                          : `${selectedTypes.size} type${selectedTypes.size !== 1 ? "s" : ""} selected`}
+                    </span>
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-0" align="start">
+                  <div className="flex items-center border-b px-3 py-2">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <input
+                      ref={searchInputRef}
+                      className="flex h-7 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                      placeholder="Search types..."
+                      value={typeSearch}
+                      onChange={(e) => setTypeSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex gap-1 border-b px-3 py-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={selectAll}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={clearAll}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="p-2">
+                      {filteredTop.length > 0 && (
+                        <>
+                          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Most Common
+                          </p>
+                          {filteredTop.map((type) => (
+                            <label
+                              key={type}
+                              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+                            >
+                              <Checkbox
+                                checked={selectedTypes.has(type)}
+                                onCheckedChange={() => toggleType(type)}
+                              />
+                              <span>{type}</span>
+                            </label>
+                          ))}
+                        </>
+                      )}
+                      {filteredTop.length > 0 && filteredRest.length > 0 && (
+                        <Separator className="my-2" />
+                      )}
+                      {filteredRest.length > 0 && (
+                        <>
+                          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Other
+                          </p>
+                          {filteredRest.map((type) => (
+                            <label
+                              key={type}
+                              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+                            >
+                              <Checkbox
+                                checked={selectedTypes.has(type)}
+                                onCheckedChange={() => toggleType(type)}
+                              />
+                              <span>{type}</span>
+                            </label>
+                          ))}
+                        </>
+                      )}
+                      {filteredTop.length === 0 && filteredRest.length === 0 && (
+                        <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                          No types found
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {allTypes.map((type) => (
-                <label
-                  key={type}
-                  className="flex items-center gap-1.5 text-sm cursor-pointer"
-                >
-                  <Checkbox
-                    checked={selectedTypes.has(type)}
-                    onCheckedChange={() => toggleType(type)}
-                  />
-                  <span>{type}</span>
-                </label>
-              ))}
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={saveDefaults}
+              disabled={selectedTypes.size === 0}
+            >
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+              Save as Default
+            </Button>
           </div>
 
           {/* Chart view toggle */}
@@ -242,7 +423,12 @@ export default function VisualizationsPage() {
                           tickFormatter={(v) => formatCurrency(v)}
                         />
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          content={
+                            <CustomTooltip
+                              hoveredType={hoveredType}
+                              suffix="_debit"
+                            />
+                          }
                         />
                         <Legend />
                         {types.map((type) => (
@@ -252,6 +438,10 @@ export default function VisualizationsPage() {
                             name={type}
                             fill={typeColorMap.get(type)}
                             stackId="debits"
+                            onMouseEnter={() =>
+                              setHoveredType(`${type}_debit`)
+                            }
+                            onMouseLeave={() => setHoveredType(null)}
                           />
                         ))}
                       </BarChart>
@@ -270,7 +460,12 @@ export default function VisualizationsPage() {
                           tickFormatter={(v) => formatCurrency(v)}
                         />
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          content={
+                            <CustomTooltip
+                              hoveredType={hoveredType}
+                              suffix="_credit"
+                            />
+                          }
                         />
                         <Legend />
                         {types.map((type) => (
@@ -280,6 +475,10 @@ export default function VisualizationsPage() {
                             name={type}
                             fill={typeColorMap.get(type)}
                             stackId="credits"
+                            onMouseEnter={() =>
+                              setHoveredType(`${type}_credit`)
+                            }
+                            onMouseLeave={() => setHoveredType(null)}
                           />
                         ))}
                       </BarChart>
@@ -303,7 +502,12 @@ export default function VisualizationsPage() {
                           tickFormatter={(v) => formatCurrency(v)}
                         />
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          content={
+                            <CustomTooltip
+                              hoveredType={hoveredType}
+                              suffix="_debit"
+                            />
+                          }
                         />
                         <Legend />
                         {types.map((type) => (
@@ -313,8 +517,18 @@ export default function VisualizationsPage() {
                             dataKey={`${type}_debit`}
                             name={type}
                             stroke={typeColorMap.get(type)}
-                            strokeWidth={2}
+                            strokeWidth={hoveredType === `${type}_debit` ? 4 : 2}
+                            strokeOpacity={
+                              hoveredType && hoveredType !== `${type}_debit`
+                                ? 0.2
+                                : 1
+                            }
                             dot={{ r: 3 }}
+                            activeDot={{
+                              onMouseEnter: () =>
+                                setHoveredType(`${type}_debit`),
+                              onMouseLeave: () => setHoveredType(null),
+                            }}
                           />
                         ))}
                       </LineChart>
@@ -333,7 +547,12 @@ export default function VisualizationsPage() {
                           tickFormatter={(v) => formatCurrency(v)}
                         />
                         <Tooltip
-                          formatter={(value) => formatCurrency(Number(value))}
+                          content={
+                            <CustomTooltip
+                              hoveredType={hoveredType}
+                              suffix="_credit"
+                            />
+                          }
                         />
                         <Legend />
                         {types.map((type) => (
@@ -343,8 +562,18 @@ export default function VisualizationsPage() {
                             dataKey={`${type}_credit`}
                             name={type}
                             stroke={typeColorMap.get(type)}
-                            strokeWidth={2}
+                            strokeWidth={hoveredType === `${type}_credit` ? 4 : 2}
+                            strokeOpacity={
+                              hoveredType && hoveredType !== `${type}_credit`
+                                ? 0.2
+                                : 1
+                            }
                             dot={{ r: 3 }}
+                            activeDot={{
+                              onMouseEnter: () =>
+                                setHoveredType(`${type}_credit`),
+                              onMouseLeave: () => setHoveredType(null),
+                            }}
                           />
                         ))}
                       </LineChart>
