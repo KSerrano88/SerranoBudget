@@ -199,6 +199,19 @@ export async function getTransactionTypes() {
   return rows.map((r: Record<string, unknown>) => r.TRAN_TYPE as string).filter(Boolean);
 }
 
+export async function getTransactionTypesRanked(topN = 10) {
+  const sql = `SELECT TRAN_TYPE, COUNT(*) AS CNT
+               FROM transactions
+               WHERE TRAN_TYPE IS NOT NULL AND TRAN_TYPE <> ''
+               GROUP BY TRAN_TYPE
+               ORDER BY CNT DESC`;
+  const { rows } = await query(sql);
+  const all = rows as Array<{ TRAN_TYPE: string; CNT: string }>;
+  const top = all.slice(0, topN).map((r) => r.TRAN_TYPE);
+  const rest = all.slice(topN).map((r) => r.TRAN_TYPE).sort();
+  return { top, rest };
+}
+
 // ===== TRANSACTION HISTORY =====
 
 export async function getTransactionHistory(params: {
@@ -306,4 +319,42 @@ export async function getMonthlyTotals() {
   }
 
   return results;
+}
+
+// ===== VISUALIZATION QUERIES =====
+
+export async function getVisualizationData(params: {
+  startDate: string;
+  endDate: string;
+  tranTypes: string[];
+}) {
+  const queryParams: (string | number)[] = [params.startDate, params.endDate];
+  let typeFilter = "";
+
+  if (params.tranTypes.length > 0) {
+    const placeholders = params.tranTypes
+      .map((_, i) => `$${i + 3}`)
+      .join(",");
+    typeFilter = `AND TRAN_TYPE IN (${placeholders})`;
+    queryParams.push(...params.tranTypes);
+  }
+
+  const sql = `SELECT
+    TRAN_TYPE,
+    TO_CHAR(DATE_TRUNC('month', TRANSACTION_DATE), 'YYYY-MM') AS MONTH,
+    ROUND(SUM(DEBIT)::numeric, 2) AS TOTAL_DEBIT,
+    ROUND(SUM(CREDIT)::numeric, 2) AS TOTAL_CREDIT
+  FROM transactions
+  WHERE TRANSACTION_DATE >= $1 AND TRANSACTION_DATE <= $2
+    ${typeFilter}
+  GROUP BY TRAN_TYPE, DATE_TRUNC('month', TRANSACTION_DATE)
+  ORDER BY MONTH, TRAN_TYPE`;
+
+  const { rows } = await query(sql, queryParams);
+  return rows as Array<{
+    TRAN_TYPE: string;
+    MONTH: string;
+    TOTAL_DEBIT: number;
+    TOTAL_CREDIT: number;
+  }>;
 }

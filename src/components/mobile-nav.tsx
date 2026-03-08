@@ -2,13 +2,14 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { DollarSign, PlusCircle, History, BarChart3 } from "lucide-react";
+import { DollarSign, PlusCircle, History, BarChart3, PieChart } from "lucide-react";
 
 const navItems = [
   { title: "Balance", href: "/balance-sheet", icon: DollarSign },
   { title: "Add Transaction", href: "/add-transaction", icon: PlusCircle },
   { title: "History", href: "/history", icon: History },
   { title: "Totals", href: "/monthly-totals", icon: BarChart3 },
+  { title: "Charts", href: "/visualizations", icon: PieChart },
 ];
 
 export function MobileNav() {
@@ -16,8 +17,8 @@ export function MobileNav() {
 
   return (
     <nav className="sticky top-0 z-50 flex md:hidden flex-col shrink-0 bg-[#000366]">
-      <div className="grid grid-cols-4 h-12">
-        <div className="col-span-3 flex items-center px-4">
+      <div className="grid grid-cols-5 h-12">
+        <div className="col-span-4 flex items-center px-4">
           <span className="text-xs font-semibold uppercase tracking-widest text-sky-300">
             Menu
           </span>
