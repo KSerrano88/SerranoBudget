@@ -8,6 +8,7 @@ import {
   PlusCircle,
   History,
   BarChart3,
+  PieChart,
   Trash2,
   LogOut,
 } from "lucide-react";
@@ -57,6 +58,11 @@ const navItems = [
     title: "Transaction Totals by Month",
     href: "/monthly-totals",
     icon: BarChart3,
+  },
+  {
+    title: "Visualizations",
+    href: "/visualizations",
+    icon: PieChart,
   },
 ];
 
