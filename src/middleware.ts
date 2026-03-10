@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 
 export default auth((req) => {
   if (!req.auth) {
+    if (req.nextUrl.pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const loginUrl = new URL("/login", req.url);
     return NextResponse.redirect(loginUrl);
   }

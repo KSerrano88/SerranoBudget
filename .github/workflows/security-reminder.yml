@@ -1,0 +1,46 @@
+name: Security Test Reminder
+
+on:
+  pull_request:
+    paths:
+      - "src/middleware.ts"
+      - "src/lib/api-utils.ts"
+      - "src/lib/auth.ts"
+      - "src/app/api/**"
+      - "next.config.ts"
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = '<!-- security-reminder -->';
+            if (comments.some(c => c.body.includes(marker))) return;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                marker,
+                '## Security-sensitive files changed',
+                '',
+                'This PR modifies files that affect authentication, authorization, or input validation.',
+                '',
+                'Before merging, please run the integration security tests:',
+                '```bash',
+                './security-tests.sh',
+                '```',
+                '',
+                'This requires the dev server and database to be running.',
+              ].join('\n'),
+            });
