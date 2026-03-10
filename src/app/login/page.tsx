@@ -47,7 +47,7 @@ export default function LoginPage() {
               Budget<span className="text-amber-400">-inator</span>
             </span>
             <p className="mt-2 text-xs text-sky-200/70">
-              Sign in to manage your finances
+              Sign in to manage your budget
             </p>
           </div>
         </div>
