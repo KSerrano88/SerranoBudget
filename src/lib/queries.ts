@@ -200,13 +200,19 @@ export async function getTransactionTypes() {
 }
 
 export async function getTransactionTypesRanked(topN = 10) {
-  const sql = `SELECT TRAN_TYPE, COUNT(*) AS CNT
+  const sql = `SELECT TRAN_TYPE,
+                      ROUND(
+                        (POWER(COUNT(DISTINCT DATE_TRUNC('month', TRANSACTION_DATE)), 2)
+                        * SUM(DEBIT + CREDIT)
+                        * LN(COUNT(*) + 1))::numeric
+                      ) AS SCORE
                FROM transactions
                WHERE TRAN_TYPE IS NOT NULL AND TRAN_TYPE <> ''
+                 AND TRANSACTION_DATE >= NOW() - INTERVAL '12 months'
                GROUP BY TRAN_TYPE
-               ORDER BY CNT DESC`;
+               ORDER BY SCORE DESC`;
   const { rows } = await query(sql);
-  const all = rows as Array<{ TRAN_TYPE: string; CNT: string }>;
+  const all = rows as Array<{ TRAN_TYPE: string; SCORE: string }>;
   const top = all.slice(0, topN).map((r) => r.TRAN_TYPE);
   const rest = all.slice(topN).map((r) => r.TRAN_TYPE).sort();
   return { top, rest };
