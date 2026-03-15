@@ -16,11 +16,12 @@ type AmountType = "debit" | "credit";
 
 export default function AddTransactionPage() {
   const router = useRouter();
-  const [types, setTypes] = useState<string[]>([]);
+  const [topTypes, setTopTypes] = useState<string[]>([]);
+  const [restTypes, setRestTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const [posted, setPosted] = useState(false);
+  const [posted, setPosted] = useState(true);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [checkNmbr, setCheckNmbr] = useState("");
   const [description, setDescription] = useState("");
@@ -32,9 +33,12 @@ export default function AddTransactionPage() {
   const [amount, setAmount] = useState("");
 
   useEffect(() => {
-    fetch("/api/transactions/types")
+    fetch("/api/transactions/types-ranked")
       .then((r) => r.json())
-      .then((data) => setTypes(data.types));
+      .then((data) => {
+        setTopTypes(data.top);
+        setRestTypes(data.rest);
+      });
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -140,7 +144,8 @@ export default function AddTransactionPage() {
 
             {/* Transaction Type */}
             <TypeSelector
-              types={types}
+              topTypes={topTypes}
+              restTypes={restTypes}
               selectedType={selectedType}
               newType={newType}
               onSelectType={setSelectedType}
