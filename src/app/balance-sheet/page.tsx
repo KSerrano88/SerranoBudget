@@ -110,7 +110,7 @@ export default function BalanceSheetPage() {
   async function handleUpdateSelected() {
     const updates = Object.entries(editData).map(([idStr, data]) => ({
       id: Number(idStr),
-      TRANSACTION_DATE: data.TRANSACTION_DATE || "",
+      TRANSACTION_DATE: (data.TRANSACTION_DATE || "").split("T")[0],
       CHECK_NMBR: data.CHECK_NMBR || "",
       DESCRIPTION: data.DESCRIPTION || "",
       NOTES: data.NOTES || "",
