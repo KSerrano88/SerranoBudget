@@ -5,13 +5,16 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 
 interface TypeSelectorProps {
-  types: string[];
+  topTypes: string[];
+  restTypes: string[];
   selectedType: string;
   newType: string;
   onSelectType: (value: string) => void;
@@ -19,7 +22,8 @@ interface TypeSelectorProps {
 }
 
 export function TypeSelector({
-  types,
+  topTypes,
+  restTypes,
   selectedType,
   newType,
   onSelectType,
@@ -35,11 +39,26 @@ export function TypeSelector({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">-- Select --</SelectItem>
-            {types.map((type) => (
-              <SelectItem key={type} value={type}>
-                {type}
-              </SelectItem>
-            ))}
+            {topTypes.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>Most Used</SelectLabel>
+                {topTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+            {restTypes.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>Other</SelectLabel>
+                {restTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
           </SelectContent>
         </Select>
         <Input
