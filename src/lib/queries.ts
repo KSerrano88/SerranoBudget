@@ -1,4 +1,5 @@
 import { query } from "./db";
+import type { ValidatedTransaction } from "./transaction-input";
 
 // ===== BALANCE SHEET QUERIES =====
 
@@ -100,17 +101,7 @@ export async function getCarryOver() {
 
 // ===== TRANSACTION CRUD =====
 
-export async function createTransaction(t: {
-  TRANSACTION_DATE: string;
-  CHECK_NMBR: string;
-  DESCRIPTION: string;
-  NOTES: string;
-  MULTI_PART_TRAN_TOTAL: number;
-  POSTED_FLAG: number;
-  TRAN_TYPE: string;
-  DEBIT: number;
-  CREDIT: number;
-}) {
+export async function createTransaction(t: ValidatedTransaction) {
   const sql = `INSERT INTO transactions
     (TRANSACTION_DATE, CHECK_NMBR, DESCRIPTION, NOTES,
      MULTI_PART_TRAN_TOTAL, POSTED_FLAG, TRAN_TYPE, DEBIT, CREDIT)
@@ -132,17 +123,7 @@ export async function createTransaction(t: {
 
 export async function updateTransaction(
   id: number,
-  t: {
-    TRANSACTION_DATE: string;
-    CHECK_NMBR: string;
-    DESCRIPTION: string;
-    NOTES: string;
-    MULTI_PART_TRAN_TOTAL: number;
-    POSTED_FLAG: number;
-    TRAN_TYPE: string;
-    DEBIT: number;
-    CREDIT: number;
-  }
+  t: ValidatedTransaction
 ) {
   const sql = `UPDATE transactions SET
     TRANSACTION_DATE = $1, CHECK_NMBR = $2, DESCRIPTION = $3,
