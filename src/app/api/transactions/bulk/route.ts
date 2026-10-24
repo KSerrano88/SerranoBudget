@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bulkUpdateSchema, bulkDeleteSchema } from "@/lib/transaction-input";
-import { updateTransaction, deleteTransactions } from "@/lib/queries";
+import { bulkUpdateTransactions, TransactionNotFoundError, deleteTransactions } from "@/lib/queries";
 import { requireAuth, errorResponse, validationError } from "@/lib/api-utils";
 
 export async function PUT(request: NextRequest) {
@@ -15,15 +15,19 @@ export async function PUT(request: NextRequest) {
       return validationError(parsed.error);
     }
 
-    for (const { id, ...transaction } of parsed.data.transactions) {
-      await updateTransaction(id, transaction);
-    }
+    const count = await bulkUpdateTransactions(parsed.data.transactions);
 
     return NextResponse.json({
       success: true,
-      count: parsed.data.transactions.length,
+      count,
     });
   } catch (error) {
+    if (error instanceof TransactionNotFoundError) {
+      return NextResponse.json(
+        { error: "Transaction not found", id: error.id },
+        { status: 404 }
+      );
+    }
     return errorResponse(error, "Bulk update error");
   }
 }

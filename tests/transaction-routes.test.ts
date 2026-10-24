@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
-vi.mock("@/lib/queries", () => ({
+vi.mock("@/lib/queries", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/queries")>(),
+  bulkUpdateTransactions: vi.fn(),
   createTransaction: vi.fn(),
   updateTransaction: vi.fn(),
   deleteTransactions: vi.fn(),
@@ -11,7 +13,7 @@ vi.mock("@/lib/queries", () => ({
 }));
 
 import { auth } from "@/lib/auth";
-import { createTransaction, updateTransaction } from "@/lib/queries";
+import { createTransaction, updateTransaction, bulkUpdateTransactions, TransactionNotFoundError } from "@/lib/queries";
 import { POST } from "@/app/api/transactions/route";
 import { PUT as update } from "@/app/api/transactions/[id]/route";
 import { PUT as bulkUpdate } from "@/app/api/transactions/bulk/route";
@@ -36,6 +38,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(auth).mockResolvedValue({ user: { name: "test" } } as never);
   vi.mocked(createTransaction).mockResolvedValue(42);
+  vi.mocked(bulkUpdateTransactions).mockResolvedValue(1);
 });
 
 const routes = [
@@ -72,6 +75,9 @@ describe.each(routes)("$name transaction validation", ({ name, status, send }) =
     if (name === "create") {
       expect(createTransaction).toHaveBeenCalledExactlyOnceWith(normalized);
       expect(await response.json()).toEqual({ id: 42 });
+    } else if (name === "bulk update") {
+      expect(bulkUpdateTransactions).toHaveBeenCalledExactlyOnceWith([{ id: 42, ...normalized }]);
+      expect(await response.json()).toEqual({ success: true, count: 1 });
     } else {
       expect(updateTransaction).toHaveBeenCalledExactlyOnceWith(42, normalized);
     }
@@ -97,6 +103,7 @@ describe.each(routes)("$name transaction validation", ({ name, status, send }) =
     });
     expect(createTransaction).not.toHaveBeenCalled();
     expect(updateTransaction).not.toHaveBeenCalled();
+    expect(bulkUpdateTransactions).not.toHaveBeenCalled();
   });
 
   it("preserves supplied amounts and posted status", async () => {
@@ -110,6 +117,8 @@ describe.each(routes)("$name transaction validation", ({ name, status, send }) =
     expect(response.status).toBe(status);
     if (name === "create") {
       expect(createTransaction).toHaveBeenCalledExactlyOnceWith({ ...normalized, ...amounts });
+    } else if (name === "bulk update") {
+      expect(bulkUpdateTransactions).toHaveBeenCalledExactlyOnceWith([{ id: 42, ...normalized, ...amounts }]);
     } else {
       expect(updateTransaction).toHaveBeenCalledExactlyOnceWith(42, { ...normalized, ...amounts });
     }
@@ -140,6 +149,7 @@ describe.each(routes)("$name transaction validation", ({ name, status, send }) =
     expect(response.status).toBe(401);
     expect(createTransaction).not.toHaveBeenCalled();
     expect(updateTransaction).not.toHaveBeenCalled();
+    expect(bulkUpdateTransactions).not.toHaveBeenCalled();
   });
 });
 
@@ -156,4 +166,43 @@ it("validates the whole batch before saving the first row", async () => {
   ));
   expect(response.status).toBe(400);
   expect(updateTransaction).not.toHaveBeenCalled();
+    expect(bulkUpdateTransactions).not.toHaveBeenCalled();
+});
+
+function bulkRequest(transactions: Record<string, unknown>[]) {
+  return new NextRequest("http://localhost/api/transactions/bulk", {
+    method: "PUT",
+    body: JSON.stringify({ transactions }),
+  });
+}
+
+it("rejects duplicate IDs before saving", async () => {
+  const response = await bulkUpdate(bulkRequest([
+    { ...minimal, id: 1 },
+    { ...minimal, id: 1 },
+  ]));
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({
+    messages: ["transactions.1.id: Duplicate transaction ID"],
+  });
+  expect(bulkUpdateTransactions).not.toHaveBeenCalled();
+});
+
+it("reports a missing transaction after the save rolls back", async () => {
+  vi.mocked(bulkUpdateTransactions).mockRejectedValue(new TransactionNotFoundError(42));
+  const response = await bulkUpdate(bulkRequest([{ ...minimal, id: 42 }]));
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ error: "Transaction not found", id: 42 });
+});
+
+it("hides database details when a bulk save fails", async () => {
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    vi.mocked(bulkUpdateTransactions).mockRejectedValue(new Error("private database detail"));
+    const response = await bulkUpdate(bulkRequest([{ ...minimal, id: 42 }]));
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "Internal server error" });
+  } finally {
+    log.mockRestore();
+  }
 });
