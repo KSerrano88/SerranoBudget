@@ -1,5 +1,5 @@
-import { query } from "./db";
-import type { ValidatedTransaction } from "./transaction-input";
+import pool, { query } from "./db";
+import type { BulkTransaction, ValidatedTransaction } from "./transaction-input";
 
 // ===== BALANCE SHEET QUERIES =====
 
@@ -121,16 +121,14 @@ export async function createTransaction(t: ValidatedTransaction) {
   return rows[0].ID_TRANSACTIONS;
 }
 
-export async function updateTransaction(
-  id: number,
-  t: ValidatedTransaction
-) {
-  const sql = `UPDATE transactions SET
-    TRANSACTION_DATE = $1, CHECK_NMBR = $2, DESCRIPTION = $3,
-    NOTES = $4, MULTI_PART_TRAN_TOTAL = $5, POSTED_FLAG = $6,
-    TRAN_TYPE = $7, DEBIT = $8, CREDIT = $9
-    WHERE ID_TRANSACTIONS = $10`;
-  await query(sql, [
+const updateTransactionSql = `UPDATE transactions SET
+  TRANSACTION_DATE = $1, CHECK_NMBR = $2, DESCRIPTION = $3,
+  NOTES = $4, MULTI_PART_TRAN_TOTAL = $5, POSTED_FLAG = $6,
+  TRAN_TYPE = $7, DEBIT = $8, CREDIT = $9
+  WHERE ID_TRANSACTIONS = $10`;
+
+function updateTransactionParams(id: number, t: ValidatedTransaction) {
+  return [
     t.TRANSACTION_DATE,
     t.CHECK_NMBR,
     t.DESCRIPTION,
@@ -141,7 +139,48 @@ export async function updateTransaction(
     t.DEBIT,
     t.CREDIT,
     id,
-  ]);
+  ];
+}
+
+export async function updateTransaction(id: number, t: ValidatedTransaction) {
+  await query(updateTransactionSql, updateTransactionParams(id, t));
+}
+
+export class TransactionNotFoundError extends Error {
+  constructor(readonly id: number) {
+    super(`Transaction ${id} was not found`);
+    this.name = "TransactionNotFoundError";
+  }
+}
+
+export async function bulkUpdateTransactions(transactions: BulkTransaction[]) {
+  const client = await pool.connect();
+  let discardClient = false;
+  try {
+    await client.query("BEGIN");
+    // A stable row order reduces deadlocks between overlapping saves.
+    for (const transaction of [...transactions].sort((a, b) => a.id - b.id)) {
+      const result = await client.query(
+        updateTransactionSql,
+        updateTransactionParams(transaction.id, transaction)
+      );
+      if (result.rowCount !== 1) {
+        throw new TransactionNotFoundError(transaction.id);
+      }
+    }
+    await client.query("COMMIT");
+    return transactions.length;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // Discard a connection whose transaction state is unknown.
+      discardClient = true;
+    }
+    throw error;
+  } finally {
+    client.release(discardClient);
+  }
 }
 
 export async function deleteTransactions(ids: number[]) {

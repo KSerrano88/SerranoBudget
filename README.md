@@ -106,3 +106,15 @@ Deployed to Vercel with a Neon PostgreSQL database. Environment variables are co
 ## Maintainer
 
 KSerrano88 — https://github.com/KSerrano88
+
+## Bulk save tests
+
+Bulk updates save all rows in one database transaction. A missing transaction ID
+or a database error rolls back the complete save. Duplicate IDs return a
+validation error before any write.
+
+Run the tests with `npm test`. To include the PostgreSQL tests, set
+`TEST_DATABASE_URL` to a test database connection string before you run the command.
+The tests create and remove a separate schema. The database user needs permission
+to create schemas. Without this variable, the PostgreSQL tests are skipped.
+GitHub Actions runs these tests with PostgreSQL 16.

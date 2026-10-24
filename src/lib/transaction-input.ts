@@ -15,7 +15,19 @@ export const transactionSchema = z.object({
 export const bulkUpdateSchema = z.object({
   transactions: z.array(
     transactionSchema.extend({ id: z.number().int().min(1) })
-  ).min(1).max(500),
+  ).min(1).max(500).superRefine((transactions, context) => {
+    const seen = new Set<number>();
+    transactions.forEach(({ id }, index) => {
+      if (seen.has(id)) {
+        context.addIssue({
+          code: "custom",
+          path: [index, "id"],
+          message: "Duplicate transaction ID",
+        });
+      }
+      seen.add(id);
+    });
+  }),
 });
 
 export const bulkDeleteSchema = z.object({
@@ -24,3 +36,5 @@ export const bulkDeleteSchema = z.object({
 
 export type TransactionInput = z.input<typeof transactionSchema>;
 export type ValidatedTransaction = z.output<typeof transactionSchema>;
+
+export type BulkTransaction = z.output<typeof bulkUpdateSchema>["transactions"][number];
