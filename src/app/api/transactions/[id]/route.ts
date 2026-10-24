@@ -1,23 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod/v4";
+import { transactionSchema } from "@/lib/transaction-input";
 import {
   getTransactionsByIds,
   updateTransaction,
   deleteTransactions,
 } from "@/lib/queries";
-import { requireAuth, errorResponse, isCalendarDate, validationError } from "@/lib/api-utils";
-
-const updateTransactionSchema = z.object({
-  TRANSACTION_DATE: z.iso.date(),
-  CHECK_NMBR: z.string().max(50).optional().default(""),
-  DESCRIPTION: z.string().min(1).max(500),
-  NOTES: z.string().max(1000).optional().default(""),
-  MULTI_PART_TRAN_TOTAL: z.number().optional().default(0),
-  POSTED_FLAG: z.number().int().min(0).max(1).optional().default(0),
-  TRAN_TYPE: z.string().min(1).max(100),
-  DEBIT: z.number().min(0).optional().default(0),
-  CREDIT: z.number().min(0).optional().default(0),
-});
+import { requireAuth, errorResponse, validationError } from "@/lib/api-utils";
 
 export async function GET(
   _request: NextRequest,
@@ -56,23 +44,13 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const parsed = updateTransactionSchema.safeParse(body);
+    const parsed = transactionSchema.safeParse(body);
 
     if (!parsed.success) {
       return validationError(parsed.error);
     }
 
-    if (!isCalendarDate(parsed.data.TRANSACTION_DATE)) {
-      return NextResponse.json(
-        { error: "Invalid calendar date" },
-        { status: 400 }
-      );
-    }
-
-    await updateTransaction(numId, {
-      ...parsed.data,
-      TRANSACTION_DATE: parsed.data.TRANSACTION_DATE.split("T")[0],
-    });
+    await updateTransaction(numId, parsed.data);
     return NextResponse.json({ success: true });
   } catch (error) {
     return errorResponse(error, "Update transaction error");

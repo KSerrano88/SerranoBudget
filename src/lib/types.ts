@@ -11,17 +11,7 @@ export interface Transaction {
   CREDIT: number;
 }
 
-export interface TransactionInput {
-  TRANSACTION_DATE: string;
-  CHECK_NMBR?: string;
-  DESCRIPTION: string;
-  NOTES?: string;
-  MULTI_PART_TRAN_TOTAL?: number;
-  POSTED_FLAG: 0 | 1;
-  TRAN_TYPE: string;
-  DEBIT: number;
-  CREDIT: number;
-}
+export type { TransactionInput } from "./transaction-input";
 
 export interface BalanceSummary {
   SUM_DEBIT: number;

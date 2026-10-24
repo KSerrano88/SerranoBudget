@@ -1,24 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { z } from "zod/v4";
+import {
+  transactionSchema,
+  bulkUpdateSchema,
+  bulkDeleteSchema,
+} from "@/lib/transaction-input";
 
-// Replicate the schemas from the API routes to test them independently
-const createTransactionSchema = z.object({
-  TRANSACTION_DATE: z.iso.date(),
-  CHECK_NMBR: z.string().max(50).optional().default(""),
-  DESCRIPTION: z.string().min(1).max(500),
-  NOTES: z.string().max(1000).optional().default(""),
-  MULTI_PART_TRAN_TOTAL: z.number().optional().default(0),
-  POSTED_FLAG: z.number().int().min(0).max(1).optional().default(0),
-  TRAN_TYPE: z.string().min(1).max(100),
-  DEBIT: z.number().min(0).optional().default(0),
-  CREDIT: z.number().min(0).optional().default(0),
-});
-
-const bulkDeleteSchema = z.object({
-  ids: z.array(z.number().int().min(1)).min(1).max(500),
-});
-
-describe("createTransactionSchema", () => {
+describe("transactionSchema", () => {
   const validTransaction = {
     TRANSACTION_DATE: "2024-01-15",
     DESCRIPTION: "Groceries",
@@ -27,12 +14,12 @@ describe("createTransactionSchema", () => {
   };
 
   it("accepts a valid minimal transaction", () => {
-    const result = createTransactionSchema.safeParse(validTransaction);
+    const result = transactionSchema.safeParse(validTransaction);
     expect(result.success).toBe(true);
   });
 
   it("applies defaults for optional fields", () => {
-    const result = createTransactionSchema.safeParse(validTransaction);
+    const result = transactionSchema.safeParse(validTransaction);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.CHECK_NMBR).toBe("");
@@ -44,7 +31,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("accepts a full transaction with all fields", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       TRANSACTION_DATE: "2024-06-15",
       CHECK_NMBR: "1234",
       DESCRIPTION: "Rent payment",
@@ -60,7 +47,7 @@ describe("createTransactionSchema", () => {
 
   // Required field validation
   it("rejects missing TRANSACTION_DATE", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       DESCRIPTION: "Test",
       TRAN_TYPE: "Food",
     });
@@ -68,7 +55,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects missing DESCRIPTION", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       TRANSACTION_DATE: "2024-01-15",
       TRAN_TYPE: "Food",
     });
@@ -76,7 +63,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects missing TRAN_TYPE", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       TRANSACTION_DATE: "2024-01-15",
       DESCRIPTION: "Test",
     });
@@ -84,7 +71,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects empty DESCRIPTION", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       DESCRIPTION: "",
     });
@@ -92,7 +79,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects empty TRAN_TYPE", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       TRAN_TYPE: "",
     });
@@ -101,7 +88,7 @@ describe("createTransactionSchema", () => {
 
   // Type validation
   it("rejects non-string DESCRIPTION", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       DESCRIPTION: 12345,
     });
@@ -109,7 +96,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects non-number DEBIT", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       DEBIT: "fifty",
     });
@@ -118,7 +105,7 @@ describe("createTransactionSchema", () => {
 
   // Range validation
   it("rejects negative DEBIT", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       DEBIT: -50,
     });
@@ -126,7 +113,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects negative CREDIT", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       CREDIT: -100,
     });
@@ -134,7 +121,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects POSTED_FLAG > 1", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       POSTED_FLAG: 2,
     });
@@ -142,7 +129,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects POSTED_FLAG < 0", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       POSTED_FLAG: -1,
     });
@@ -150,7 +137,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects non-integer POSTED_FLAG", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       POSTED_FLAG: 0.5,
     });
@@ -158,49 +145,49 @@ describe("createTransactionSchema", () => {
   });
 
   // Length validation
-  it("rejects DESCRIPTION over 500 chars", () => {
-    const result = createTransactionSchema.safeParse({
+  it("rejects DESCRIPTION over 100 chars", () => {
+    const result = transactionSchema.safeParse({
       ...validTransaction,
-      DESCRIPTION: "A".repeat(501),
+      DESCRIPTION: "A".repeat(101),
     });
     expect(result.success).toBe(false);
   });
 
-  it("accepts DESCRIPTION at exactly 500 chars", () => {
-    const result = createTransactionSchema.safeParse({
+  it("accepts DESCRIPTION at exactly 100 chars", () => {
+    const result = transactionSchema.safeParse({
       ...validTransaction,
-      DESCRIPTION: "A".repeat(500),
+      DESCRIPTION: "A".repeat(100),
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects TRAN_TYPE over 100 chars", () => {
-    const result = createTransactionSchema.safeParse({
+  it("rejects TRAN_TYPE over 50 chars", () => {
+    const result = transactionSchema.safeParse({
       ...validTransaction,
-      TRAN_TYPE: "A".repeat(101),
+      TRAN_TYPE: "A".repeat(51),
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejects CHECK_NMBR over 50 chars", () => {
-    const result = createTransactionSchema.safeParse({
+  it("rejects CHECK_NMBR over 10 chars", () => {
+    const result = transactionSchema.safeParse({
       ...validTransaction,
-      CHECK_NMBR: "1".repeat(51),
+      CHECK_NMBR: "1".repeat(11),
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejects NOTES over 1000 chars", () => {
-    const result = createTransactionSchema.safeParse({
+  it("rejects NOTES over 200 chars", () => {
+    const result = transactionSchema.safeParse({
       ...validTransaction,
-      NOTES: "A".repeat(1001),
+      NOTES: "A".repeat(201),
     });
     expect(result.success).toBe(false);
   });
 
   // Date format validation
   it("rejects invalid date format", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       TRANSACTION_DATE: "not-a-date",
     });
@@ -208,7 +195,7 @@ describe("createTransactionSchema", () => {
   });
 
   it("rejects MM-DD-YYYY format", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       TRANSACTION_DATE: "01-15-2024",
     });
@@ -217,13 +204,13 @@ describe("createTransactionSchema", () => {
 
   // Empty body
   it("rejects empty object", () => {
-    const result = createTransactionSchema.safeParse({});
+    const result = transactionSchema.safeParse({});
     expect(result.success).toBe(false);
   });
 
   // Extra fields are stripped
   it("ignores extra fields", () => {
-    const result = createTransactionSchema.safeParse({
+    const result = transactionSchema.safeParse({
       ...validTransaction,
       EXTRA_FIELD: "should be ignored",
     });
@@ -277,5 +264,46 @@ describe("bulkDeleteSchema", () => {
   it("rejects missing ids field", () => {
     const result = bulkDeleteSchema.safeParse({});
     expect(result.success).toBe(false);
+  });
+});
+
+describe("bulkUpdateSchema", () => {
+  const transaction = {
+    id: 1,
+    TRANSACTION_DATE: "2024-02-29",
+    DESCRIPTION: "Groceries",
+    TRAN_TYPE: "Food",
+  };
+
+  it("keeps defaults and the row ID", () => {
+    const result = bulkUpdateSchema.parse({ transactions: [transaction] });
+    expect(result.transactions[0]).toMatchObject({
+      ...transaction,
+      CHECK_NMBR: "",
+      NOTES: "",
+      POSTED_FLAG: 0,
+      DEBIT: 0,
+      CREDIT: 0,
+      MULTI_PART_TRAN_TOTAL: 0,
+    });
+  });
+
+  it.each([0, -1, 1.5, "1", undefined])("rejects invalid row ID %s", (id) => {
+    expect(bulkUpdateSchema.safeParse({
+      transactions: [{ ...transaction, id }],
+    }).success).toBe(false);
+  });
+
+  it("rejects an empty batch", () => {
+    expect(bulkUpdateSchema.safeParse({ transactions: [] }).success).toBe(false);
+  });
+
+  it("accepts 500 rows and rejects 501 rows", () => {
+    expect(bulkUpdateSchema.safeParse({
+      transactions: Array.from({ length: 500 }, (_, i) => ({ ...transaction, id: i + 1 })),
+    }).success).toBe(true);
+    expect(bulkUpdateSchema.safeParse({
+      transactions: Array.from({ length: 501 }, (_, i) => ({ ...transaction, id: i + 1 })),
+    }).success).toBe(false);
   });
 });
