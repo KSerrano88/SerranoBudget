@@ -1,102 +1,70 @@
 import pool, { query } from "./db";
+import type { BalanceSheetFilters } from "./balance-sheet-input";
+import type { BalanceSheetData } from "./types";
 import type { BulkTransaction, ValidatedTransaction } from "./transaction-input";
 
 // ===== BALANCE SHEET QUERIES =====
 
-export async function getBalanceSheetTransactions(
-  numDaysPrior: number,
-  postStatus: "all" | "posted" | "unposted"
-) {
-  const tranDate = new Date();
-  tranDate.setDate(tranDate.getDate() - numDaysPrior);
-  const tranDateStr = tranDate.toISOString().split("T")[0];
+export async function getBalanceSheet({ days, postStatus }: BalanceSheetFilters) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
 
-  let sql: string;
-  let params: (string | number)[];
-
-  if (postStatus === "unposted") {
-    sql = `SELECT * FROM transactions
-           WHERE POSTED_FLAG = 0
-           ORDER BY TRANSACTION_DATE DESC, ID_TRANSACTIONS DESC`;
-    params = [];
-  } else if (postStatus === "posted") {
-    sql = `SELECT * FROM transactions
-           WHERE TRANSACTION_DATE >= $1
-           AND POSTED_FLAG = 1
-           ORDER BY TRANSACTION_DATE DESC, ID_TRANSACTIONS DESC`;
-    params = [tranDateStr];
-  } else {
-    sql = `SELECT * FROM transactions
-           WHERE TRANSACTION_DATE >= $1
-           ORDER BY TRANSACTION_DATE DESC, ID_TRANSACTIONS DESC`;
-    params = [tranDateStr];
-  }
-
-  const { rows } = await query(sql, params);
-  return rows;
-}
-
-export async function getDateRangeSummary(
-  numDaysPrior: number,
-  postStatus: "all" | "posted" | "unposted"
-) {
-  const tranDate = new Date();
-  tranDate.setDate(tranDate.getDate() - numDaysPrior);
-  const tranDateStr = tranDate.toISOString().split("T")[0];
-
-  let sql: string;
-  let params: (string | number)[];
-
-  if (postStatus === "unposted") {
-    sql = `SELECT ROUND(SUM(DEBIT)::numeric,2) AS SUM_DEBIT,
-                  ROUND(SUM(CREDIT)::numeric,2) AS SUM_CREDIT,
-                  (ROUND(SUM(CREDIT)::numeric,2) - ROUND(SUM(DEBIT)::numeric,2)) AS DIFFERENCE
-           FROM transactions WHERE POSTED_FLAG = 0`;
-    params = [];
-  } else if (postStatus === "posted") {
-    sql = `SELECT ROUND(SUM(DEBIT)::numeric,2) AS SUM_DEBIT,
-                  ROUND(SUM(CREDIT)::numeric,2) AS SUM_CREDIT,
-                  (ROUND(SUM(CREDIT)::numeric,2) - ROUND(SUM(DEBIT)::numeric,2)) AS DIFFERENCE
-           FROM transactions WHERE POSTED_FLAG = 1 AND TRANSACTION_DATE >= $1`;
-    params = [tranDateStr];
-  } else {
-    sql = `SELECT ROUND(SUM(DEBIT)::numeric,2) AS SUM_DEBIT,
-                  ROUND(SUM(CREDIT)::numeric,2) AS SUM_CREDIT,
-                  (ROUND(SUM(CREDIT)::numeric,2) - ROUND(SUM(DEBIT)::numeric,2)) AS DIFFERENCE
-           FROM transactions WHERE TRANSACTION_DATE >= $1`;
-    params = [tranDateStr];
-  }
-
-  const { rows } = await query(sql, params);
-  return rows[0];
-}
-
-export async function getTotalBalance() {
-  const sql = `SELECT ROUND(SUM(DEBIT)::numeric,2) AS SUM_DEBIT,
-                      ROUND(SUM(CREDIT)::numeric,2) AS SUM_CREDIT,
-                      (ROUND(SUM(CREDIT)::numeric,2) - ROUND(SUM(DEBIT)::numeric,2)) AS DIFFERENCE,
-                      ((ROUND(SUM(CREDIT)::numeric,2) - ROUND(SUM(DEBIT)::numeric,2))
-                        + (SELECT AMOUNT FROM balance_carryover WHERE IS_ACTIVE = 1)) AS TOTAL_BAL
-               FROM transactions`;
-  const { rows } = await query(sql);
-  return rows[0];
-}
-
-export async function getPostedBalance() {
-  const sql = `SELECT ROUND(SUM(DEBIT)::numeric,2) AS POSTED_DEBIT,
-                      ROUND(SUM(CREDIT)::numeric,2) AS POSTED_CREDIT,
-                      ((ROUND(SUM(CREDIT)::numeric,2) - ROUND(SUM(DEBIT)::numeric,2))
-                        + (SELECT AMOUNT FROM balance_carryover WHERE IS_ACTIVE = 1)) AS TOTAL_POSTED_BAL
-               FROM transactions WHERE POSTED_FLAG = 1`;
-  const { rows } = await query(sql);
-  return rows[0];
-}
-
-export async function getCarryOver() {
-  const sql = `SELECT ROUND(SUM(AMOUNT)::numeric,2) AS CARRYOVER_AMOUNT
-               FROM balance_carryover WHERE IS_ACTIVE = 1`;
-  const { rows } = await query(sql);
-  return rows[0];
+  // One statement keeps the rows, range totals, and overall balances in one snapshot.
+  const sql = `WITH filtered AS (
+    SELECT * FROM transactions
+    WHERE ($2 = 'unposted' AND POSTED_FLAG = 0)
+       OR ($2 <> 'unposted' AND TRANSACTION_DATE >= $1::date
+           AND ($2 = 'all' OR POSTED_FLAG = 1))
+  ), range_totals AS (
+    SELECT ROUND(SUM(DEBIT), 2) AS debit, ROUND(SUM(CREDIT), 2) AS credit
+    FROM filtered
+  ), totals AS (
+    SELECT ROUND(SUM(DEBIT), 2) AS debit, ROUND(SUM(CREDIT), 2) AS credit,
+           ROUND(SUM(DEBIT) FILTER (WHERE POSTED_FLAG = 1), 2) AS posted_debit,
+           ROUND(SUM(CREDIT) FILTER (WHERE POSTED_FLAG = 1), 2) AS posted_credit
+    FROM transactions
+  ), carryover AS (
+    SELECT ROUND(SUM(AMOUNT), 2) AS carryover_amount,
+           (SELECT AMOUNT FROM balance_carryover WHERE IS_ACTIVE = 1) AS amount
+    FROM balance_carryover WHERE IS_ACTIVE = 1
+  )
+  SELECT jsonb_build_object(
+    'transactions', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+        'ID_TRANSACTIONS', ID_TRANSACTIONS,
+        'TRANSACTION_DATE', TO_CHAR(TRANSACTION_DATE, 'YYYY-MM-DD'),
+        'CHECK_NMBR', CHECK_NMBR,
+        'DESCRIPTION', DESCRIPTION,
+        'NOTES', NOTES,
+        'MULTI_PART_TRAN_TOTAL', MULTI_PART_TRAN_TOTAL,
+        'POSTED_FLAG', POSTED_FLAG,
+        'TRAN_TYPE', TRAN_TYPE,
+        'DEBIT', DEBIT,
+        'CREDIT', CREDIT
+      ) ORDER BY TRANSACTION_DATE DESC, ID_TRANSACTIONS DESC)
+      FROM filtered
+    ), '[]'::jsonb),
+    'summary', jsonb_build_object(
+      'rangeSummary', jsonb_build_object(
+        'SUM_DEBIT', r.debit, 'SUM_CREDIT', r.credit, 'DIFFERENCE', r.credit - r.debit
+      ),
+      'totalBalance', jsonb_build_object(
+        'SUM_DEBIT', t.debit, 'SUM_CREDIT', t.credit, 'DIFFERENCE', t.credit - t.debit,
+        'TOTAL_BAL', t.credit - t.debit + c.amount
+      ),
+      'postedBalance', jsonb_build_object(
+        'POSTED_DEBIT', t.posted_debit, 'POSTED_CREDIT', t.posted_credit,
+        'TOTAL_POSTED_BAL', t.posted_credit - t.posted_debit + c.amount
+      ),
+      'carryOver', jsonb_build_object('CARRYOVER_AMOUNT', c.carryover_amount)
+    )
+  ) AS data
+  FROM range_totals r CROSS JOIN totals t CROSS JOIN carryover c`;
+  const { rows } = await query<{ DATA: BalanceSheetData }>(sql, [
+    startDate.toISOString().split("T")[0],
+    postStatus,
+  ]);
+  return rows[0].DATA;
 }
 
 // ===== TRANSACTION CRUD =====

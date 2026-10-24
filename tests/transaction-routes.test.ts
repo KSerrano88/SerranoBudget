@@ -9,7 +9,7 @@ vi.mock("@/lib/queries", async (importOriginal) => ({
   updateTransaction: vi.fn(),
   deleteTransactions: vi.fn(),
   getTransactionsByIds: vi.fn(),
-  getBalanceSheetTransactions: vi.fn(),
+  getBalanceSheet: vi.fn(),
 }));
 
 import { auth } from "@/lib/auth";

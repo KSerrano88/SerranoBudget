@@ -8,11 +8,6 @@ vi.mock("@/lib/db", () => ({
 
 import { query } from "@/lib/db";
 import {
-  getBalanceSheetTransactions,
-  getDateRangeSummary,
-  getTotalBalance,
-  getPostedBalance,
-  getCarryOver,
   createTransaction,
   updateTransaction,
   deleteTransactions,
@@ -28,115 +23,6 @@ const mockQuery = vi.mocked(query);
 
 beforeEach(() => {
   vi.clearAllMocks();
-});
-
-// ===== Balance Sheet Queries =====
-
-describe("getBalanceSheetTransactions", () => {
-  it("queries all transactions with date filter for 'all' status", async () => {
-    mockQuery.mockResolvedValue({ rows: [{ ID_TRANSACTIONS: 1 }] } as never);
-
-    await getBalanceSheetTransactions(30, "all");
-
-    expect(mockQuery).toHaveBeenCalledTimes(1);
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("TRANSACTION_DATE >= $1");
-    expect(sql).not.toContain("POSTED_FLAG");
-    expect(params).toHaveLength(1);
-  });
-
-  it("filters by POSTED_FLAG = 1 for 'posted' status", async () => {
-    mockQuery.mockResolvedValue({ rows: [] } as never);
-
-    await getBalanceSheetTransactions(30, "posted");
-
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("POSTED_FLAG = 1");
-    expect(sql).toContain("TRANSACTION_DATE >= $1");
-    expect(params).toHaveLength(1);
-  });
-
-  it("filters by POSTED_FLAG = 0 for 'unposted' status without date filter", async () => {
-    mockQuery.mockResolvedValue({ rows: [] } as never);
-
-    await getBalanceSheetTransactions(30, "unposted");
-
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("POSTED_FLAG = 0");
-    expect(sql).not.toContain("TRANSACTION_DATE >= $1");
-    expect(params).toHaveLength(0);
-  });
-
-  it("returns rows from query result", async () => {
-    const mockRows = [
-      { ID_TRANSACTIONS: 1, DESCRIPTION: "Test" },
-      { ID_TRANSACTIONS: 2, DESCRIPTION: "Test 2" },
-    ];
-    mockQuery.mockResolvedValue({ rows: mockRows } as never);
-
-    const result = await getBalanceSheetTransactions(30, "all");
-    expect(result).toEqual(mockRows);
-  });
-});
-
-describe("getDateRangeSummary", () => {
-  it("returns first row for 'all' status", async () => {
-    const summary = { SUM_DEBIT: 100, SUM_CREDIT: 200, DIFFERENCE: 100 };
-    mockQuery.mockResolvedValue({ rows: [summary] } as never);
-
-    const result = await getDateRangeSummary(30, "all");
-    expect(result).toEqual(summary);
-  });
-
-  it("uses POSTED_FLAG filter for 'posted' status", async () => {
-    mockQuery.mockResolvedValue({ rows: [{}] } as never);
-
-    await getDateRangeSummary(30, "posted");
-
-    const [sql] = mockQuery.mock.calls[0];
-    expect(sql).toContain("POSTED_FLAG = 1");
-  });
-
-  it("omits date filter for 'unposted' status", async () => {
-    mockQuery.mockResolvedValue({ rows: [{}] } as never);
-
-    await getDateRangeSummary(30, "unposted");
-
-    const [sql, params] = mockQuery.mock.calls[0];
-    expect(sql).toContain("POSTED_FLAG = 0");
-    expect(params).toHaveLength(0);
-  });
-});
-
-describe("getTotalBalance", () => {
-  it("returns aggregate balance with carryover", async () => {
-    const balance = { SUM_DEBIT: 500, SUM_CREDIT: 1000, DIFFERENCE: 500, TOTAL_BAL: 1500 };
-    mockQuery.mockResolvedValue({ rows: [balance] } as never);
-
-    const result = await getTotalBalance();
-    expect(result).toEqual(balance);
-  });
-});
-
-describe("getPostedBalance", () => {
-  it("returns posted-only balance", async () => {
-    const balance = { POSTED_DEBIT: 300, POSTED_CREDIT: 800, TOTAL_POSTED_BAL: 1500 };
-    mockQuery.mockResolvedValue({ rows: [balance] } as never);
-
-    const result = await getPostedBalance();
-    expect(result).toEqual(balance);
-    const [sql] = mockQuery.mock.calls[0];
-    expect(sql).toContain("POSTED_FLAG = 1");
-  });
-});
-
-describe("getCarryOver", () => {
-  it("returns carryover amount", async () => {
-    mockQuery.mockResolvedValue({ rows: [{ CARRYOVER_AMOUNT: 5000 }] } as never);
-
-    const result = await getCarryOver();
-    expect(result).toEqual({ CARRYOVER_AMOUNT: 5000 });
-  });
 });
 
 // ===== Transaction CRUD =====

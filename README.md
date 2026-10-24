@@ -118,3 +118,15 @@ Run the tests with `npm test`. To include the PostgreSQL tests, set
 The tests create and remove a separate schema. The database user needs permission
 to create schemas. Without this variable, the PostgreSQL tests are skipped.
 GitHub Actions runs these tests with PostgreSQL 16.
+
+## Balance sheet reads
+
+The balance sheet loads rows and totals through
+`GET /api/transactions/balance-sheet?days=30&postStatus=all`.
+One SQL statement reads all values from one database snapshot.
+Unposted rows ignore the date range. Overall balances include all dates.
+The page cancels outdated requests and shows a retry button when loading fails.
+The existing transaction list and summary URLs use the same read module.
+
+The PostgreSQL tests also check balance sheet filters, totals, and concurrent writes.
+Set `TEST_DATABASE_URL` as described above to run these tests locally.

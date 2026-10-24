@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Transaction } from "@/lib/types";
+import { useBalanceSheet } from "@/hooks/use-balance-sheet";
+import type { BalanceSheetFilters } from "@/lib/balance-sheet-input";
 import { formatDate } from "@/lib/format";
 import { SummaryBar } from "@/components/summary-bar";
 import { TransactionTable } from "@/components/transaction-table";
@@ -21,49 +23,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
-type PostStatus = "all" | "posted" | "unposted";
-
-interface Summary {
-  rangeSummary: {
-    SUM_DEBIT: number;
-    SUM_CREDIT: number;
-    DIFFERENCE: number;
-  };
-  totalBalance: { TOTAL_BAL: number };
-  postedBalance: { TOTAL_POSTED_BAL: number };
-  carryOver: { CARRYOVER_AMOUNT: number };
-}
+type PostStatus = BalanceSheetFilters["postStatus"];
 
 export default function BalanceSheetPage() {
   const [numDays, setNumDays] = useState(30);
   const [numDaysInput, setNumDaysInput] = useState("30");
   const [postStatus, setPostStatus] = useState<PostStatus>("all");
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, refresh } = useBalanceSheet({ days: numDays, postStatus });
+  const transactions = data?.transactions ?? [];
+  const summary = data?.summary;
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<
     Record<number, Partial<Transaction>>
   >({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const [transRes, summaryRes] = await Promise.all([
-      fetch(`/api/transactions?days=${numDays}&postStatus=${postStatus}`),
-      fetch(`/api/transactions/summary?days=${numDays}&postStatus=${postStatus}`),
-    ]);
-    const transData = await transRes.json();
-    const summaryData = await summaryRes.json();
-    setTransactions(transData.transactions);
-    setSummary(summaryData);
-    setLoading(false);
-  }, [numDays, postStatus]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   function handleToggleSelect(id: number) {
     setSelectedIds((prev) => {
@@ -132,7 +106,7 @@ export default function BalanceSheetPage() {
       setEditing(false);
       setEditData({});
       setSelectedIds(new Set());
-      fetchData();
+      refresh();
     } else {
       toast.error("Failed to update transactions");
     }
@@ -149,7 +123,7 @@ export default function BalanceSheetPage() {
       toast.success("Transactions deleted");
       setSelectedIds(new Set());
       setDeleteDialogOpen(false);
-      fetchData();
+      refresh();
     } else {
       toast.error("Failed to delete transactions");
     }
@@ -206,9 +180,9 @@ export default function BalanceSheetPage() {
               sumDebit={summary.rangeSummary?.SUM_DEBIT || 0}
               sumCredit={summary.rangeSummary?.SUM_CREDIT || 0}
               difference={summary.rangeSummary?.DIFFERENCE || 0}
-              postedBalance={summary.postedBalance?.TOTAL_POSTED_BAL}
-              totalBalance={summary.totalBalance?.TOTAL_BAL}
-              carryOver={summary.carryOver?.CARRYOVER_AMOUNT}
+              postedBalance={summary.postedBalance?.TOTAL_POSTED_BAL ?? 0}
+              totalBalance={summary.totalBalance?.TOTAL_BAL ?? 0}
+              carryOver={summary.carryOver?.CARRYOVER_AMOUNT ?? 0}
             />
           )}
 
@@ -279,9 +253,16 @@ export default function BalanceSheetPage() {
             </div>
           </div>
 
+          {error && (
+            <div role="alert" className="space-y-2">
+              <p className="text-destructive">{error}</p>
+              <Button variant="outline" size="sm" onClick={refresh}>Retry</Button>
+            </div>
+          )}
+
           {loading ? (
             <p className="text-muted-foreground">Loading transactions...</p>
-          ) : (
+          ) : !error && (
             <TransactionTable
               transactions={
                 editing

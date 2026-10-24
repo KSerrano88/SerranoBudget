@@ -1,32 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseBalanceSheetFilters } from "@/lib/balance-sheet-input";
 import { transactionSchema } from "@/lib/transaction-input";
 import {
-  getBalanceSheetTransactions,
+  getBalanceSheet,
   createTransaction,
 } from "@/lib/queries";
-import { requireAuth, errorResponse, isValidDays, validationError } from "@/lib/api-utils";
+import { requireAuth, errorResponse, validationError } from "@/lib/api-utils";
 
 export async function GET(request: NextRequest) {
   const authError = await requireAuth();
   if (authError) return authError;
 
-  const searchParams = request.nextUrl.searchParams;
-  const days = Number(searchParams.get("days") || "30");
+  const filters = parseBalanceSheetFilters(request.nextUrl.searchParams);
+  if (!filters.success) return validationError(filters.error);
 
-  if (!isValidDays(days)) {
-    return NextResponse.json(
-      { error: "days must be a number between 0 and 3650" },
-      { status: 400 }
-    );
+  try {
+    const { transactions } = await getBalanceSheet(filters.data);
+    return NextResponse.json({ transactions });
+  } catch (error) {
+    return errorResponse(error, "Read transactions error");
   }
-
-  const postStatus = (searchParams.get("postStatus") || "all") as
-    | "all"
-    | "posted"
-    | "unposted";
-
-  const transactions = await getBalanceSheetTransactions(days, postStatus);
-  return NextResponse.json({ transactions });
 }
 
 export async function POST(request: NextRequest) {

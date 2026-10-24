@@ -40,3 +40,17 @@ export interface MonthlyRollup {
   debits: Array<{ TRAN_TYPE: string; SUM_DEBIT: number }>;
   credits: Array<{ TRAN_TYPE: string; SUM_CREDIT: number }>;
 }
+
+type NullableAmounts<T> = { [K in keyof T]: T[K] | null };
+
+export interface BalanceSheetSummary {
+  rangeSummary: NullableAmounts<BalanceSummary>;
+  totalBalance: NullableAmounts<TotalBalance>;
+  postedBalance: NullableAmounts<PostedBalance>;
+  carryOver: NullableAmounts<CarryOver>;
+}
+
+export interface BalanceSheetData {
+  transactions: Transaction[];
+  summary: BalanceSheetSummary;
+}
