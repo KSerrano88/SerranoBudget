@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { BalanceSheetFilters } from "@/lib/balance-sheet-input";
 import type { BalanceSheetData } from "@/lib/types";
 
+import { useTransactionRevision } from "./use-transaction-revision";
+
 interface ReadState {
   key: string;
   data: BalanceSheetData | null;
@@ -13,7 +15,8 @@ interface ReadState {
 export function useBalanceSheet({ days, postStatus }: BalanceSheetFilters) {
   const [revision, setRevision] = useState(0);
   const [state, setState] = useState<ReadState | null>(null);
-  const key = `${days}:${postStatus}:${revision}`;
+  const transactionRevision = useTransactionRevision();
+  const key = `${days}:${postStatus}:${revision}:${transactionRevision}`;
   const refresh = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {

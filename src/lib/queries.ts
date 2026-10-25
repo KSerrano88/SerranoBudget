@@ -1,6 +1,6 @@
 import pool, { query } from "./db";
 import type { BalanceSheetFilters } from "./balance-sheet-input";
-import type { BalanceSheetData } from "./types";
+import type { BalanceSheetData, Transaction } from "./types";
 import type { BulkTransaction, ValidatedTransaction } from "./transaction-input";
 import type { PoolClient } from "pg";
 import type { TemplateInput, RecurringTemplate, RecurringBatch, RecurringCheck, RecurringDuplicate } from "./recurring-input";
@@ -160,17 +160,19 @@ export async function deleteTransactions(ids: number[]) {
   await query(sql, ids);
 }
 
-export async function deleteLastTransaction() {
+export async function getLastTransaction(): Promise<Transaction | null> {
   const { rows } = await query(
-    "SELECT MAX(ID_TRANSACTIONS) AS maxid FROM transactions"
+    "SELECT * FROM transactions ORDER BY ID_TRANSACTIONS DESC LIMIT 1"
   );
-  const maxId = rows[0]?.MAXID;
-  if (maxId) {
-    await query("DELETE FROM transactions WHERE ID_TRANSACTIONS = $1", [
-      maxId,
-    ]);
-  }
-  return maxId;
+  return (rows[0] ?? null) as Transaction | null;
+}
+
+export async function deleteLastTransaction(id: number) {
+  const { rows } = await query(
+    "DELETE FROM transactions WHERE ID_TRANSACTIONS = $1 RETURNING ID_TRANSACTIONS",
+    [id]
+  );
+  return rows[0]?.ID_TRANSACTIONS ?? null;
 }
 
 export async function getTransactionsByIds(ids: number[]) {
