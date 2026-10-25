@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { useTransactionRevision } from "@/hooks/use-transaction-revision";
+
 interface HistoryResult {
   transactions: Transaction[];
   summary: {
@@ -38,6 +40,10 @@ export default function HistoryPage() {
   const [tranTypeContains, setTranTypeContains] = useState("");
   const [result, setResult] = useState<HistoryResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const revision = useTransactionRevision();
+  const [submission, setSubmission] = useState(0);
 
   useEffect(() => {
     fetch("/api/transactions/types")
@@ -45,7 +51,7 @@ export default function HistoryPage() {
       .then((data) => setTypes(data.types));
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
@@ -60,11 +66,35 @@ export default function HistoryPage() {
       params.set("tranTypeContains", tranTypeContains.trim());
     }
 
-    const res = await fetch(`/api/transactions/history?${params}`);
-    const data = await res.json();
-    setResult(data);
-    setLoading(false);
+    setSubmittedQuery(params.toString());
+    setSubmission((value) => value + 1);
   }
+
+  useEffect(() => {
+    if (submittedQuery === null) return;
+    const controller = new AbortController();
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/transactions/history?${submittedQuery}`, {
+          signal: controller.signal, cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Read failed");
+        const data = await response.json();
+        if (!controller.signal.aborted) setResult(data);
+      } catch {
+        if (!controller.signal.aborted) {
+          setResult(null);
+          setError("Failed to load transaction history. Please try again.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [submittedQuery, revision, submission]);
 
   return (
     <div className="space-y-6">
@@ -133,6 +163,8 @@ export default function HistoryPage() {
           </form>
         </CardContent>
       </Card>
+
+      {error && <p role="alert" className="text-destructive">{error}</p>}
 
       {result && (
         <div className="space-y-4">

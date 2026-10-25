@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { useTransactionRevision } from "./use-transaction-revision";
+
 export interface VisualizationRow {
   TRAN_TYPE: string;
   MONTH: string;
@@ -22,14 +24,16 @@ export function useVisualizationData(
   const params = new URLSearchParams({ startDate, endDate });
   if (selectedTypes.size > 0)
     params.set("tranTypes", [...selectedTypes].join(","));
-  const key = startDate && endDate ? params.toString() : "";
+  const revision = useTransactionRevision();
+  const query = startDate && endDate ? params.toString() : "";
+  const key = query ? `${query}:${revision}` : "";
 
   useEffect(() => {
     if (!key) return;
     const controller = new AbortController();
     async function load() {
       try {
-        const response = await fetch(`/api/transactions/visualization?${key}`, {
+        const response = await fetch(`/api/transactions/visualization?${query}`, {
           signal: controller.signal,
           cache: "no-store",
         });
@@ -50,7 +54,7 @@ export function useVisualizationData(
     }
     void load();
     return () => controller.abort();
-  }, [key]);
+  }, [key, query]);
 
   const current = state?.key === key ? state : null;
   return {

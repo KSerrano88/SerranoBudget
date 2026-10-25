@@ -205,6 +205,15 @@ check number 10, description 100, notes 200, and transaction type 50 characters.
 Bulk updates accept 1–500 rows. Duplicate IDs are rejected before writes.
 A missing ID or a database error rolls back the whole bulk save.
 
+The mobile **Menu** button opens the same sidebar used on desktop. **Delete Last
+Transaction** selects the most recently added entry across all dates and filters,
+including posted entries. The confirmation shows its description, date, debit,
+and credit. Confirmation and retries delete only that ID. A new entry cannot
+change the selected record. The app disables confirmation during deletion and
+keeps the dialog open on failure. After deletion, it refreshes the current data
+without changing the page or filters. Empty lists and already deleted records
+show a message.
+
 ## Transaction routes
 
 All transaction routes require an authenticated session. Read dates use
@@ -228,7 +237,8 @@ Valid posted states are `all`, `posted`, and `unposted`; valid days are 0–3650
 | GET | `/api/transactions/bulk?ids=1,2` | Read selected rows for separate template review. |
 | PUT | `/api/transactions/bulk` | Save a body of `{ transactions: [{ id, ...fields }] }` as one database transaction. |
 | DELETE | `/api/transactions/bulk` | Delete a body of `{ ids: [...] }`. |
-| DELETE | `/api/transactions/last` | Delete the transaction with the highest ID. |
+| GET | `/api/transactions/last` | Preview the transaction with the highest ID, or return `transaction: null`. |
+| DELETE | `/api/transactions/last` | Delete the confirmed transaction with body `{ id }`. Return 404 if it was already deleted. |
 | GET | `/api/recurring-transactions/templates` | List saved templates. |
 | POST | `/api/recurring-transactions/templates` | Create a template. |
 | PUT | `/api/recurring-transactions/templates/[id]` | Update template defaults. |

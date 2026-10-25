@@ -106,26 +106,18 @@ describe("deleteTransactions", () => {
 });
 
 describe("deleteLastTransaction", () => {
-  it("finds max ID and deletes it", async () => {
-    mockQuery
-      .mockResolvedValueOnce({ rows: [{ MAXID: 100 }] } as never)
-      .mockResolvedValueOnce({ rows: [] } as never);
-
-    const result = await deleteLastTransaction();
-
-    expect(result).toBe(100);
-    expect(mockQuery).toHaveBeenCalledTimes(2);
-    const [deleteSql, deleteParams] = mockQuery.mock.calls[1];
-    expect(deleteSql).toContain("DELETE FROM transactions");
-    expect(deleteParams).toEqual([100]);
+  it("deletes only the confirmed ID in one statement", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ ID_TRANSACTIONS: 100 }] } as never);
+    expect(await deleteLastTransaction(100)).toBe(100);
+    expect(mockQuery).toHaveBeenCalledExactlyOnceWith(
+      "DELETE FROM transactions WHERE ID_TRANSACTIONS = $1 RETURNING ID_TRANSACTIONS",
+      [100]
+    );
   });
 
-  it("returns undefined when no transactions exist", async () => {
-    mockQuery.mockResolvedValue({ rows: [{ MAXID: null }] } as never);
-
-    const result = await deleteLastTransaction();
-
-    expect(result).toBeNull();
+  it("returns null when the confirmed row no longer exists", async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] } as never);
+    expect(await deleteLastTransaction(100)).toBeNull();
     expect(mockQuery).toHaveBeenCalledTimes(1);
   });
 });

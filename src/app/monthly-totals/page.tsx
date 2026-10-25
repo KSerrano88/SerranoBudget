@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+import { useTransactionRevision } from "@/hooks/use-transaction-revision";
 
 interface MonthData {
   month: number;
@@ -24,14 +27,30 @@ export default function MonthlyTotalsPage() {
   const [months, setMonths] = useState<MonthData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const revision = useTransactionRevision();
+  const [retry, setRetry] = useState(0);
+  const [error, setError] = useState(false);
+
   useEffect(() => {
-    fetch("/api/transactions/monthly-totals")
-      .then((r) => r.json())
-      .then((data) => {
-        setMonths(data.months);
-        setLoading(false);
-      });
-  }, []);
+    const controller = new AbortController();
+    async function load() {
+      setError(false);
+      try {
+        const response = await fetch("/api/transactions/monthly-totals", {
+          signal: controller.signal, cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Read failed");
+        const data = await response.json();
+        if (!controller.signal.aborted) setMonths(data.months);
+      } catch {
+        if (!controller.signal.aborted) setError(true);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [revision, retry]);
 
   if (loading) {
     return (
@@ -48,7 +67,12 @@ export default function MonthlyTotalsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Transaction Totals by Month</h1>
 
-      {months.length === 0 ? (
+      {error ? (
+        <div role="alert" className="space-y-2">
+          <p>Failed to load monthly totals.</p>
+          <Button onClick={() => setRetry((value) => value + 1)}>Retry</Button>
+        </div>
+      ) : months.length === 0 ? (
         <p className="text-muted-foreground">No transaction data found.</p>
       ) : (
         months.map((m) => (

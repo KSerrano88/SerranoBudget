@@ -10,7 +10,6 @@ import {
   History,
   BarChart3,
   PieChart,
-  Trash2,
   LogOut,
 } from "lucide-react";
 import {
@@ -26,18 +25,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
+import { DeleteLastTransaction } from "@/components/delete-last-transaction";
 
 const navItems = [
   {
@@ -71,16 +59,6 @@ const navItems = [
 export function AppSidebar() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
-
-  async function handleDeleteLast() {
-    const res = await fetch("/api/transactions/last", { method: "DELETE" });
-    if (res.ok) {
-      toast.success("Last transaction deleted");
-      window.location.reload();
-    } else {
-      toast.error("Failed to delete last transaction");
-    }
-  }
 
   return (
     <Sidebar>
@@ -126,31 +104,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <SidebarMenuButton className="py-3 text-[13px] font-semibold text-red-300 hover:text-red-200">
-                      <Trash2 className="h-4 w-4" />
-                      <span>Delete Last Transaction</span>
-                    </SidebarMenuButton>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        Delete Last Transaction
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete the most recently added
-                        transaction? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDeleteLast}>
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <DeleteLastTransaction />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

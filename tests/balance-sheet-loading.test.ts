@@ -85,3 +85,17 @@ describe("balance sheet loading", () => {
     expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
   });
 });
+
+
+it("refreshes after deletion while keeping the current filters", async () => {
+  const fetch = vi.fn().mockResolvedValue(response());
+  vi.stubGlobal("fetch", fetch);
+  const { result } = renderHook(() => useBalanceSheet({ days: 7, postStatus: "unposted" }));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  const initialUrl = fetch.mock.calls[0][0];
+  act(() => window.dispatchEvent(new Event("transactions-changed")));
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(fetch.mock.calls[1][0]).toBe(initialUrl);
+  expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+});

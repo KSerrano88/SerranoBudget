@@ -2,7 +2,10 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { DollarSign, PlusCircle, Repeat, History, BarChart3, PieChart } from "lucide-react";
+import { DollarSign, PlusCircle, Repeat, History, BarChart3, PieChart, Menu } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
 
 const navItems = [
   { title: "Balance", href: "/balance-sheet", icon: DollarSign },
@@ -15,13 +18,21 @@ const navItems = [
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { openMobile, setOpenMobile } = useSidebar();
 
   return (
     <nav className="sticky top-0 z-50 flex md:hidden flex-col shrink-0 bg-[#000366]">
       <div className="flex h-12 items-center justify-between px-4">
-        <span className="text-xs font-semibold uppercase tracking-widest text-sky-300">
+        <Button
+          variant="ghost"
+          className="min-h-11 text-sky-300 hover:bg-[#010337] hover:text-white"
+          aria-label="Open menu"
+          aria-expanded={openMobile}
+          onClick={() => setOpenMobile(true)}
+        >
+          <Menu aria-hidden="true" />
           Menu
-        </span>
+        </Button>
         <div className="shrink-0 rounded bg-gradient-to-br from-[#1a2876] to-[#000244] px-3 py-1.5 shadow ring-1 ring-white/10">
           <div className="text-center">
             <span className="block text-[7px] font-semibold uppercase tracking-[0.25em] text-sky-300">
