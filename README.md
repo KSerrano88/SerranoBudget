@@ -307,6 +307,8 @@ Open **Recurring Transactions** in the navigation. Create a template there, or
 select rows on the Balance Sheet and choose **Save as Template** between
 **Edit Selected** and **Delete Selected**. Review and save each selected row as
 a separate template. History also supports saving individual transactions.
+The template list shows notes beside each description. It sorts by day, then
+credit before debit, then description.
 Templates support income and expenses. They store the description, category,
 amount, notes, day of the month, and default posted status.
 New templates default to unposted. Leave the amount empty for a variable bill.

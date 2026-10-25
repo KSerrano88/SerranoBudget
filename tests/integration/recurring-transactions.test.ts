@@ -90,6 +90,23 @@ describe.skipIf(!testUrl)("recurring transactions with PostgreSQL", () => {
     ).rows;
   }
 
+  it("lists templates by day, credit before debit, then description", async () => {
+    const inputs = [
+      { DESCRIPTION: "Z PAYCHECK", DIRECTION: "credit", DAY_OF_MONTH: 1 },
+      { DESCRIPTION: "A BILL", DIRECTION: "debit", DAY_OF_MONTH: 1 },
+      { DESCRIPTION: "Z BILL", DIRECTION: "debit", DAY_OF_MONTH: 1 },
+      { DESCRIPTION: "A PAYCHECK", DIRECTION: "credit", DAY_OF_MONTH: 15 },
+    ];
+    for (const input of inputs.toReversed()) {
+      await queries.createRecurringTemplate(
+        templateSchema.parse({ ...input, TRAN_TYPE: "Test", AMOUNT: 100 }),
+      );
+    }
+    expect(
+      (await queries.getRecurringTemplates()).map((row) => row.DESCRIPTION),
+    ).toEqual(["Z PAYCHECK", "A BILL", "Z BILL", "A PAYCHECK", "RENT"]);
+  });
+
   it("adds a group with separate review values and preserves the template", async () => {
     const input = batch();
     input.transactions.push({

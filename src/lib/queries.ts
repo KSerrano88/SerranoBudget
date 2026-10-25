@@ -359,7 +359,7 @@ export async function getVisualizationData(params: {
 
 export async function getRecurringTemplates() {
   const { rows } = await query<RecurringTemplate>(
-    "SELECT * FROM recurring_templates ORDER BY DESCRIPTION, ID_TEMPLATE"
+    "SELECT * FROM recurring_templates ORDER BY DAY_OF_MONTH, DIRECTION, DESCRIPTION, ID_TEMPLATE"
   );
   return rows;
 }

@@ -573,8 +573,15 @@ export default function RecurringTransactionsPage() {
                         }}
                       />
                       <span className="min-w-0">
-                        <span className="block break-words font-semibold">
-                          {template.DESCRIPTION}
+                        <span className="block break-words">
+                          <span className="font-semibold">
+                            {template.DESCRIPTION}
+                          </span>
+                          {template.NOTES && (
+                            <span className="text-muted-foreground">
+                              {" · "}{template.NOTES}
+                            </span>
+                          )}
                         </span>
                         <span className="text-sm text-muted-foreground">
                           Day {template.DAY_OF_MONTH} · {template.TRAN_TYPE} ·{" "}
