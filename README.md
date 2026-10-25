@@ -280,13 +280,15 @@ Vercel instances and reset when an instance restarts.
 ## Recurring transactions
 
 Open **Recurring Transactions** in the navigation. Create a template there, or
-select **Save as template** beside an existing transaction on the Balance Sheet
-or History page. Templates support income and expenses. They store the
-description, category, amount, notes, day of the month, and default posted status.
+select rows on the Balance Sheet and choose **Save as Template** between
+**Edit Selected** and **Delete Selected**. Review and save each selected row as
+a separate template. History also supports saving individual transactions.
+Templates support income and expenses. They store the description, category,
+amount, notes, day of the month, and default posted status.
 New templates default to unposted. Leave the amount empty for a variable bill.
 
-Select templates and a month, then select **Review selected**. The month defaults
-to the current local month. A saved day that does not exist uses the last day of
+Select templates and a month, then select **Add Selected Transactions**.
+The month defaults to the current local month. A saved day that does not exist uses the last day of
 that month. During review, you can change each field. Changing the group month
 resets dates to the saved days. Review changes do not update templates. Amounts
 are required during review. Check numbers and multi-part totals start empty.
@@ -295,7 +297,10 @@ The app warns when an existing transaction from the same template falls in a
 reviewed month. Accept the warning to add another. The app adds the whole group
 or none. Failed requests keep your review changes. Retrying the same saved
 request does not add the group again. After success, the app opens the Balance
-Sheet and shows the number added.
+Sheet and shows the number added. New rows have a green highlight and a **New**
+label. The message and highlights clear together after 10 seconds. Select
+**Dismiss** to clear both sooner. The date range expands when needed to show
+older transactions from the group.
 
 Edit templates separately to change future defaults. Template deletion requires
 confirmation and preserves existing transactions. There is no automatic schedule.

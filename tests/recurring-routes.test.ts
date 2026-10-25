@@ -137,10 +137,13 @@ describe("recurring API validation and responses", () => {
     expect(await response.json()).toMatchObject({ duplicates });
   });
   it("returns the saved count", async () => {
-    vi.mocked(queries.createRecurringTransactions).mockResolvedValue(1);
+    vi.mocked(queries.createRecurringTransactions).mockResolvedValue({
+      count: 1,
+      ids: [42],
+    });
     const response = await add(request(batch));
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ count: 1 });
+    expect(await response.json()).toEqual({ count: 1, ids: [42] });
   });
   it("rejects malformed JSON as invalid input", async () => {
     const response = await add(

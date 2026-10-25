@@ -10,11 +10,13 @@ import { templateValues, type RecurringDraft } from "@/lib/recurring-draft";
 export function RecurringTemplateEditor({
   initial,
   templateId,
+  progress,
   onSaved,
   onCancel,
 }: {
   initial: RecurringDraft;
   templateId?: number;
+  progress?: { current: number; total: number };
   onSaved: (template: RecurringTemplate) => void;
   onCancel: () => void;
 }) {
@@ -61,6 +63,9 @@ export function RecurringTemplateEditor({
       <CardHeader>
         <CardTitle>
           {templateId ? "Edit template" : "Create template"}
+          {progress &&
+            progress.total > 1 &&
+            ` (${progress.current} of ${progress.total})`}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -79,7 +84,11 @@ export function RecurringTemplateEditor({
             />
             <div className="flex flex-wrap gap-3">
               <Button type="submit">
-                {busy ? "Saving..." : "Save template"}
+                {busy
+                  ? "Saving..."
+                  : progress && progress.current < progress.total
+                    ? "Save template and continue"
+                    : "Save template"}
               </Button>
               <Button type="button" variant="outline" onClick={onCancel}>
                 Cancel

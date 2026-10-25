@@ -99,7 +99,10 @@ describe.skipIf(!testUrl)("recurring transactions with PostgreSQL", () => {
       AMOUNT: 2000,
       POSTED_FLAG: 1,
     });
-    expect(await queries.createRecurringTransactions(input)).toBe(2);
+    expect(await queries.createRecurringTransactions(input)).toEqual({
+      count: 2,
+      ids: [1, 2],
+    });
     expect(await rows()).toMatchObject([
       {
         DESCRIPTION: "RENT REVIEWED",
@@ -127,10 +130,10 @@ describe.skipIf(!testUrl)("recurring transactions with PostgreSQL", () => {
         ...second,
         allowDuplicates: true,
       }),
-    ).toBe(1);
+    ).toMatchObject({ count: 1, ids: expect.any(Array) });
     expect(
       await queries.createRecurringTransactions(batch(1060, "2026-03-01")),
-    ).toBe(1);
+    ).toMatchObject({ count: 1, ids: expect.any(Array) });
     expect(await rows()).toHaveLength(3);
   });
   it("serializes concurrent groups so one gets a duplicate warning", async () => {
@@ -148,14 +151,29 @@ describe.skipIf(!testUrl)("recurring transactions with PostgreSQL", () => {
   });
   it("returns a saved group's count on retry and rejects changed values for the same request", async () => {
     const input = batch();
-    expect(await queries.createRecurringTransactions(input)).toBe(1);
-    expect(await queries.createRecurringTransactions(input)).toBe(1);
+    const saved = await queries.createRecurringTransactions(input);
+    expect(saved).toEqual({ count: 1, ids: [1] });
+    expect(await queries.createRecurringTransactions(input)).toEqual(saved);
     const changed = batch(1200, "2026-02-28", input.requestId);
     await expect(
       queries.createRecurringTransactions(changed),
     ).rejects.toBeInstanceOf(queries.RecurringRequestConflictError);
     expect(await rows()).toHaveLength(1);
   });
+  it("accepts request records saved before row IDs were included", async () => {
+    const input = batch();
+    await db.query(
+      `INSERT INTO recurring_batches (REQUEST_ID, PAYLOAD, TRANSACTION_COUNT)
+      VALUES ($1, $2::jsonb, 1)`,
+      [input.requestId, JSON.stringify(input.transactions)],
+    );
+    expect(await queries.createRecurringTransactions(input)).toEqual({
+      count: 1,
+      ids: [],
+    });
+    expect(await rows()).toHaveLength(0);
+  });
+
   it("rolls back the whole group and request record when an insert fails", async () => {
     const input = batch();
     input.transactions.push({ ...input.transactions[0], AMOUNT: 100000000 });
@@ -167,7 +185,10 @@ describe.skipIf(!testUrl)("recurring transactions with PostgreSQL", () => {
       (await db.query("SELECT * FROM recurring_batches")).rows,
     ).toHaveLength(0);
     input.transactions.pop();
-    expect(await queries.createRecurringTransactions(input)).toBe(1);
+    expect(await queries.createRecurringTransactions(input)).toMatchObject({
+      count: 1,
+      ids: expect.any(Array),
+    });
   });
   it("rejects a deleted template without saving other rows", async () => {
     const input = batch();

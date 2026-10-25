@@ -428,11 +428,12 @@ export async function createRecurringTransactions(batch: RecurringBatch) {
       ON CONFLICT (REQUEST_ID) DO NOTHING RETURNING TRANSACTION_COUNT`,
     [batch.requestId, payload, batch.transactions.length]);
     if (!inserted.rowCount) {
-      const { rows } = await client.query(`SELECT TRANSACTION_COUNT, PAYLOAD = $2::jsonb AS matches
+      const { rows } = await client.query(`SELECT TRANSACTION_COUNT, COALESCE(PAYLOAD->'transactions', PAYLOAD) = $2::jsonb AS matches,
+        COALESCE(PAYLOAD->'ids', '[]'::jsonb) AS ids
         FROM recurring_batches WHERE REQUEST_ID = $1`, [batch.requestId, payload]);
       if (!rows[0]?.matches) throw new RecurringRequestConflictError();
       await client.query("COMMIT");
-      return rows[0].transaction_count as number;
+      return { count: rows[0].transaction_count as number, ids: rows[0].ids as number[] };
     }
 
     // Serialize groups that use the same templates before checking for duplicates.
@@ -443,7 +444,7 @@ export async function createRecurringTransactions(batch: RecurringBatch) {
     const duplicates = await getRecurringDuplicates(batch.transactions, client);
     if (duplicates.length && !batch.allowDuplicates) throw new RecurringDuplicateError(duplicates);
 
-    await client.query(`INSERT INTO transactions
+    const created = await client.query<{ id_transactions: number }>(`INSERT INTO transactions
       (TRANSACTION_DATE, CHECK_NMBR, DESCRIPTION, NOTES, MULTI_PART_TRAN_TOTAL,
        POSTED_FLAG, TRAN_TYPE, DEBIT, CREDIT, RECURRING_TEMPLATE_ID)
       SELECT "TRANSACTION_DATE", "CHECK_NMBR", "DESCRIPTION", "NOTES", "MULTI_PART_TRAN_TOTAL",
@@ -453,9 +454,15 @@ export async function createRecurringTransactions(batch: RecurringBatch) {
       FROM jsonb_to_recordset($1::jsonb) AS r(
         "TRANSACTION_DATE" date, "CHECK_NMBR" text, "DESCRIPTION" text, "NOTES" text,
         "MULTI_PART_TRAN_TOTAL" numeric, "POSTED_FLAG" smallint, "TRAN_TYPE" text,
-        "DIRECTION" text, "AMOUNT" numeric, "TEMPLATE_ID" integer)`, [payload]);
+        "DIRECTION" text, "AMOUNT" numeric, "TEMPLATE_ID" integer)
+      RETURNING ID_TRANSACTIONS`, [payload]);
+    const transactionIds = created.rows.map(row => row.id_transactions);
+    // A retry must return the same rows for the Balance Sheet highlight.
+    await client.query(`UPDATE recurring_batches
+      SET PAYLOAD = jsonb_build_object('transactions', $2::jsonb, 'ids', $3::jsonb)
+      WHERE REQUEST_ID = $1`, [batch.requestId, payload, JSON.stringify(transactionIds)]);
     await client.query("COMMIT");
-    return batch.transactions.length;
+    return { count: batch.transactions.length, ids: transactionIds };
   } catch (error) {
     try { await client.query("ROLLBACK"); }
     catch { discardClient = true; }

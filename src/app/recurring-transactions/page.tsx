@@ -32,6 +32,8 @@ import {
   reviewValues,
   type RecurringDraft,
 } from "@/lib/recurring-draft";
+import { addedTransactionsUrl } from "@/lib/added-transactions";
+import type { Transaction } from "@/lib/types";
 import { formatCurrency } from "@/lib/format";
 
 export default function RecurringTransactionsPage() {
@@ -46,6 +48,9 @@ export default function RecurringTransactionsPage() {
   const [editor, setEditor] = useState<{
     draft: RecurringDraft;
     id?: number;
+    remaining?: RecurringDraft[];
+    position?: number;
+    total?: number;
   } | null>(null);
   const [review, setReview] = useState<RecurringDraft[] | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RecurringTemplate | null>(
@@ -79,16 +84,31 @@ export default function RecurringTransactionsPage() {
         setTemplates(data.templates);
         setMonth(currentMonth());
         const from = new URLSearchParams(window.location.search).get("from");
-        if (from && /^\d+$/.test(from)) {
-          const source = await fetch(`/api/transactions/${from}`, {
-            signal: controller.signal,
-            cache: "no-store",
-          });
+        if (from) {
+          const source = await fetch(
+            `/api/transactions/bulk?ids=${encodeURIComponent(from)}`,
+            {
+              signal: controller.signal,
+              cache: "no-store",
+            },
+          );
           if (!source.ok)
-            throw new Error("Could not load the source transaction.");
-          const { transaction } = await source.json();
+            throw new Error("Could not load the selected transactions.");
+          const { transactions }: { transactions: Transaction[] } =
+            await source.json();
+          const ids = [...new Set(from.split(",").map(Number))];
+          const drafts = ids.map((id) =>
+            draftFromTransaction(
+              transactions.find((row) => row.ID_TRANSACTIONS === id)!,
+            ),
+          );
           if (!controller.signal.aborted)
-            setEditor({ draft: draftFromTransaction(transaction) });
+            setEditor({
+              draft: drafts[0],
+              remaining: drafts.slice(1),
+              position: 1,
+              total: drafts.length,
+            });
         }
       } catch (error) {
         if (!controller.signal.aborted)
@@ -250,10 +270,13 @@ export default function RecurringTransactionsPage() {
           data.messages?.join(". ") || data.error || "Could not add the group.",
         );
       }
-      toast.success(
-        `${data.count} transaction${data.count === 1 ? "" : "s"} added`,
+      router.push(
+        addedTransactionsUrl(
+          data.count,
+          data.ids || [],
+          review.map((row) => row.date),
+        ),
       );
-      router.push("/balance-sheet");
     } catch (error) {
       setError(
         error instanceof Error
@@ -297,9 +320,16 @@ export default function RecurringTransactionsPage() {
         </div>
       ) : editor ? (
         <RecurringTemplateEditor
-          key={editor.id ?? "new"}
+          key={
+            editor.id ?? (editor.position ? `source-${editor.position}` : "new")
+          }
           initial={editor.draft}
           templateId={editor.id}
+          progress={
+            editor.position && editor.total
+              ? { current: editor.position, total: editor.total }
+              : undefined
+          }
           onCancel={closeEditor}
           onSaved={(saved) => {
             setTemplates((rows) =>
@@ -312,7 +342,16 @@ export default function RecurringTransactionsPage() {
                   a.ID_TEMPLATE - b.ID_TEMPLATE,
               ),
             );
-            closeEditor();
+            if (editor.remaining?.length) {
+              setEditor({
+                draft: editor.remaining[0],
+                remaining: editor.remaining.slice(1),
+                position: editor.position! + 1,
+                total: editor.total,
+              });
+            } else {
+              closeEditor();
+            }
             toast.success("Template saved");
           }}
         />
@@ -478,8 +517,9 @@ export default function RecurringTransactionsPage() {
               <CardContent className="space-y-2">
                 <p>No saved templates yet.</p>
                 <p className="text-sm text-muted-foreground">
-                  Create a template here, or use “Save as template” beside a
-                  transaction on the Balance Sheet or History page.
+                  Create a template here, or select transactions on the Balance
+                  Sheet and choose “Save as Template”. You can also save a
+                  transaction from History.
                 </p>
               </CardContent>
             </Card>
@@ -508,7 +548,7 @@ export default function RecurringTransactionsPage() {
                   }
                   onClick={startReview}
                 >
-                  Review selected ({selected.size})
+                  Add Selected Transactions ({selected.size})
                 </Button>
               </div>
               <ul className="space-y-3">

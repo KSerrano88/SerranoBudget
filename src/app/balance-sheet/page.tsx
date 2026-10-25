@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { parseAddedTransactions } from "@/lib/added-transactions";
 import { Transaction } from "@/lib/types";
 import { useBalanceSheet } from "@/hooks/use-balance-sheet";
 import type { BalanceSheetFilters } from "@/lib/balance-sheet-input";
@@ -26,8 +28,16 @@ import { toast } from "sonner";
 type PostStatus = BalanceSheetFilters["postStatus"];
 
 export default function BalanceSheetPage() {
-  const [numDays, setNumDays] = useState(30);
-  const [numDaysInput, setNumDaysInput] = useState("30");
+  return <Suspense fallback={<p>Loading transactions...</p>}><BalanceSheetContent /></Suspense>;
+}
+
+function BalanceSheetContent() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [added] = useState(() => parseAddedTransactions(params));
+  const [showAddedFeedback, setShowAddedFeedback] = useState(true);
+  const [numDays, setNumDays] = useState(added?.days ?? 30);
+  const [numDaysInput, setNumDaysInput] = useState(String(added?.days ?? 30));
   const [postStatus, setPostStatus] = useState<PostStatus>("all");
   const { data, loading, error, refresh } = useBalanceSheet({ days: numDays, postStatus });
   const transactions = data?.transactions ?? [];
@@ -38,6 +48,16 @@ export default function BalanceSheetPage() {
     Record<number, Partial<Transaction>>
   >({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (params.has("added")) router.replace("/balance-sheet", { scroll: false });
+  }, [params, router]);
+
+  useEffect(() => {
+    if (!added || loading || error) return;
+    const timeout = setTimeout(() => setShowAddedFeedback(false), 10000);
+    return () => clearTimeout(timeout);
+  }, [added, loading, error]);
 
   function handleToggleSelect(id: number) {
     setSelectedIds((prev) => {
@@ -173,6 +193,11 @@ export default function BalanceSheetPage() {
         </div>
       </div>
 
+      {added && showAddedFeedback && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-600 bg-emerald-50 p-4 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100">
+        <p role="status">{added.count} new transaction{added.count === 1 ? "" : "s"} added.</p>
+        <Button variant="outline" size="sm" onClick={() => setShowAddedFeedback(false)}>Dismiss</Button>
+      </div>}
+
       <Card>
         <CardContent className="space-y-6">
           {summary && (
@@ -211,7 +236,7 @@ export default function BalanceSheetPage() {
               </Button>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {!editing && (
                 <>
                   <Button
@@ -221,6 +246,14 @@ export default function BalanceSheetPage() {
                     onClick={handleEditSelected}
                   >
                     Edit Selected
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={() => router.push(`/recurring-transactions?from=${[...selectedIds].join(",")}`)}
+                  >
+                    Save as Template
                   </Button>
                   <Button
                     variant="outline"
@@ -271,6 +304,7 @@ export default function BalanceSheetPage() {
                     )
                   : transactions
               }
+              highlightedIds={added && showAddedFeedback ? new Set(added.ids) : undefined}
               selectable={!editing}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}

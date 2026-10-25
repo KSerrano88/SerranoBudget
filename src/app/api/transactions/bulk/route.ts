@@ -1,7 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { bulkUpdateSchema, bulkDeleteSchema } from "@/lib/transaction-input";
-import { bulkUpdateTransactions, TransactionNotFoundError, deleteTransactions } from "@/lib/queries";
+import { bulkUpdateTransactions, TransactionNotFoundError, deleteTransactions, getTransactionsByIds } from "@/lib/queries";
 import { requireAuth, errorResponse, validationError } from "@/lib/api-utils";
+
+export async function GET(request: NextRequest) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+  const parsed = bulkDeleteSchema.safeParse({
+    ids: (request.nextUrl.searchParams.get("ids") || "").split(",").map(Number),
+  });
+  if (!parsed.success) return validationError(parsed.error);
+  try {
+    const ids = [...new Set(parsed.data.ids)];
+    const transactions = await getTransactionsByIds(ids);
+    if (transactions.length !== ids.length) {
+      return NextResponse.json({ error: "A selected transaction no longer exists." }, { status: 404 });
+    }
+    return NextResponse.json({ transactions });
+  } catch (error) {
+    return errorResponse(error, "Read selected transactions error");
+  }
+}
 
 export async function PUT(request: NextRequest) {
   const authError = await requireAuth();

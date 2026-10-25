@@ -16,10 +16,9 @@ export async function POST(request: NextRequest) {
   );
   if (!parsed.success) return validationError(parsed.error);
   try {
-    return NextResponse.json(
-      { count: await createRecurringTransactions(parsed.data) },
-      { status: 201 },
-    );
+    return NextResponse.json(await createRecurringTransactions(parsed.data), {
+      status: 201,
+    });
   } catch (error) {
     if (error instanceof RecurringDuplicateError) {
       return NextResponse.json(

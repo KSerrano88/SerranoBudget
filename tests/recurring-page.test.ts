@@ -38,7 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.history.replaceState({}, "", "/recurring-transactions");
   duplicates = [];
-  add = vi.fn().mockResolvedValue(response({ count: 1 }, 201));
+  add = vi.fn().mockResolvedValue(response({ count: 1, ids: [42] }, 201));
   fetchMock = vi.fn(async (url: string, options?: RequestInit) => {
     if (url === "/api/recurring-transactions/templates")
       return response({ templates: [template] });
@@ -62,11 +62,85 @@ async function review() {
   fireEvent.change(screen.getByLabelText("Month"), {
     target: { value: "2026-02" },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Review selected (1)" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Add Selected Transactions (1)" }),
+  );
   await waitFor(() =>
     expect(screen.queryByText("Checking for duplicates...")).toBeNull(),
   );
 }
+
+describe("saving selected transactions as templates", () => {
+  it("reviews each selected transaction separately and resets the form between saves", async () => {
+    window.history.replaceState({}, "", "/recurring-transactions?from=42,43");
+    const baseFetch = fetchMock.getMockImplementation()!;
+    let nextId = 10;
+    fetchMock.mockImplementation(async (url, options) => {
+      if (url.startsWith("/api/transactions/bulk?ids="))
+        return response({
+          transactions: [
+            {
+              ID_TRANSACTIONS: 42,
+              DESCRIPTION: "FIRST BILL",
+              TRANSACTION_DATE: "2026-10-10",
+              TRAN_TYPE: "Housing",
+              DEBIT: 100,
+              CREDIT: 0,
+              NOTES: "First note",
+            },
+            {
+              ID_TRANSACTIONS: 43,
+              DESCRIPTION: "SECOND BILL",
+              TRANSACTION_DATE: "2026-10-15",
+              TRAN_TYPE: "Utilities",
+              DEBIT: 200,
+              CREDIT: 0,
+              NOTES: "Second note",
+            },
+          ],
+        });
+      if (
+        url === "/api/recurring-transactions/templates" &&
+        options?.method === "POST"
+      ) {
+        return response(
+          {
+            template: {
+              ...JSON.parse(options.body as string),
+              ID_TEMPLATE: nextId++,
+            },
+          },
+          201,
+        );
+      }
+      return baseFetch(url, options);
+    });
+    render(createElement(Page));
+    await screen.findByText("Create template (1 of 2)");
+    expect(
+      (screen.getByLabelText("Description (required)") as HTMLInputElement)
+        .value,
+    ).toBe("FIRST BILL");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save template and continue" }),
+    );
+    await screen.findByText("Create template (2 of 2)");
+    expect(
+      (screen.getByLabelText("Description (required)") as HTMLInputElement)
+        .value,
+    ).toBe("SECOND BILL");
+    expect(
+      (screen.getByLabelText("Default amount (optional)") as HTMLInputElement)
+        .value,
+    ).toBe("200");
+    fireEvent.click(screen.getByRole("button", { name: "Save template" }));
+    await screen.findByRole("button", { name: "Edit SECOND BILL" });
+    expect(
+      screen.getByRole("button", { name: "Edit FIRST BILL" }),
+    ).toBeTruthy();
+    expect(replace).toHaveBeenCalledWith("/recurring-transactions");
+  });
+});
 
 describe("recurring transaction review", () => {
   it("requires variable amounts and applies month-end dates and unposted defaults", async () => {
@@ -107,7 +181,11 @@ describe("recurring transaction review", () => {
       (screen.getByLabelText("Amount (required)") as HTMLInputElement).value,
     ).toBe("1100.50");
     fireEvent.click(screen.getByRole("button", { name: "Add 1 transaction" }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/balance-sheet"));
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith(
+        expect.stringContaining("/balance-sheet?added=1&newIds=42"),
+      ),
+    );
     const first = JSON.parse(add.mock.calls[0][0]!.body as string);
     const second = JSON.parse(add.mock.calls[1][0]!.body as string);
     expect(first.requestId).toBe(second.requestId);
@@ -116,7 +194,6 @@ describe("recurring transaction review", () => {
       AMOUNT: 1100.5,
       POSTED_FLAG: 1,
     });
-    expect(success).toHaveBeenCalledWith("1 transaction added");
     expect(template.DESCRIPTION).toBe("RENT");
   });
   it("requires acknowledgement before adding a duplicate", async () => {
