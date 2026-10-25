@@ -13,10 +13,10 @@ vi.mock("@/lib/queries", async (importOriginal) => ({
 }));
 
 import { auth } from "@/lib/auth";
-import { createTransaction, updateTransaction, bulkUpdateTransactions, TransactionNotFoundError } from "@/lib/queries";
+import { createTransaction, updateTransaction, bulkUpdateTransactions, TransactionNotFoundError, getTransactionsByIds } from "@/lib/queries";
 import { POST } from "@/app/api/transactions/route";
 import { PUT as update } from "@/app/api/transactions/[id]/route";
-import { PUT as bulkUpdate } from "@/app/api/transactions/bulk/route";
+import { PUT as bulkUpdate, GET as readSelected } from "@/app/api/transactions/bulk/route";
 import { toInputDate } from "@/lib/format";
 
 const minimal = {
@@ -205,4 +205,28 @@ it("hides database details when a bulk save fails", async () => {
   } finally {
     log.mockRestore();
   }
+});
+
+
+describe("read selected transactions for templates", () => {
+  it("requires authentication", async () => {
+    vi.mocked(auth).mockResolvedValue(null as never);
+    expect((await readSelected(new NextRequest("http://localhost/api/transactions/bulk?ids=1"))).status).toBe(401);
+    expect(getTransactionsByIds).not.toHaveBeenCalled();
+  });
+  it("validates IDs before reading", async () => {
+    expect((await readSelected(new NextRequest("http://localhost/api/transactions/bulk?ids=1,no"))).status).toBe(400);
+    expect(getTransactionsByIds).not.toHaveBeenCalled();
+  });
+  it("returns the selected transactions once each", async () => {
+    vi.mocked(getTransactionsByIds).mockResolvedValue([{ ID_TRANSACTIONS: 1 }, { ID_TRANSACTIONS: 2 }]);
+    const response = await readSelected(new NextRequest("http://localhost/api/transactions/bulk?ids=1,2,1"));
+    expect(response.status).toBe(200);
+    expect(getTransactionsByIds).toHaveBeenCalledWith([1, 2]);
+    expect(await response.json()).toEqual({ transactions: [{ ID_TRANSACTIONS: 1 }, { ID_TRANSACTIONS: 2 }] });
+  });
+  it("reports a source transaction deleted before the review starts", async () => {
+    vi.mocked(getTransactionsByIds).mockResolvedValue([{ ID_TRANSACTIONS: 1 }]);
+    expect((await readSelected(new NextRequest("http://localhost/api/transactions/bulk?ids=1,2"))).status).toBe(404);
+  });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Transaction } from "@/lib/types";
 import { formatCurrency, formatDate, toInputDate } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,6 +19,8 @@ import {
 interface TransactionTableProps {
   transactions: Transaction[];
   selectable?: boolean;
+  showTemplateLinks?: boolean;
+  highlightedIds?: Set<number>;
   selectedIds?: Set<number>;
   onToggleSelect?: (id: number) => void;
   onToggleSelectAll?: () => void;
@@ -29,6 +32,8 @@ interface TransactionTableProps {
 export function TransactionTable({
   transactions,
   selectable = false,
+  showTemplateLinks = false,
+  highlightedIds,
   selectedIds,
   onToggleSelect,
   onToggleSelectAll,
@@ -51,6 +56,7 @@ export function TransactionTable({
             {selectable && (
               <TableHead className="w-10">
                 <Checkbox
+                  aria-label="Select all transactions"
                   checked={allSelected}
                   onCheckedChange={() => onToggleSelectAll?.()}
                 />
@@ -65,13 +71,14 @@ export function TransactionTable({
             <TableHead className={hideOnMobile}>Type</TableHead>
             <TableHead className="text-right">Debit</TableHead>
             <TableHead className="text-right">Credit</TableHead>
+            {showTemplateLinks && !editable && <TableHead>Template</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {transactions.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={selectable ? 10 : 9}
+                colSpan={(selectable ? 10 : 9) + (showTemplateLinks && !editable ? 1 : 0)}
                 className="text-center text-muted-foreground py-8"
               >
                 No transactions found
@@ -85,11 +92,15 @@ export function TransactionTable({
                 ? { ...t, ...editData![t.ID_TRANSACTIONS] }
                 : t;
 
+              const isNew = highlightedIds?.has(t.ID_TRANSACTIONS) ?? false;
               return (
-                <TableRow key={t.ID_TRANSACTIONS}>
+                <TableRow key={t.ID_TRANSACTIONS}
+                  data-new={isNew || undefined}
+                  className={isNew ? "bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 dark:hover:bg-emerald-900 motion-reduce:transition-none" : undefined}>
                   {selectable && (
                     <TableCell>
                       <Checkbox
+                        aria-label={`Select transaction ${t.DESCRIPTION}`}
                         checked={selectedIds?.has(t.ID_TRANSACTIONS) || false}
                         onCheckedChange={() =>
                           onToggleSelect?.(t.ID_TRANSACTIONS)
@@ -176,7 +187,7 @@ export function TransactionTable({
                         maxLength={100}
                       />
                     ) : (
-                      data.DESCRIPTION
+                      <span>{data.DESCRIPTION}{isNew && <span className="ml-2 rounded bg-emerald-700 px-2 py-0.5 text-xs font-semibold text-white">New</span>}</span>
                     )}
                   </TableCell>
                   <TableCell className={hideOnMobile}>
@@ -281,6 +292,11 @@ export function TransactionTable({
                       ""
                     )}
                   </TableCell>
+                  {showTemplateLinks && !editable && <TableCell>
+                    <Link className="inline-flex min-h-11 items-center whitespace-nowrap text-sm underline underline-offset-4"
+                      href={`/recurring-transactions?from=${t.ID_TRANSACTIONS}`}
+                      aria-label={`Save ${t.DESCRIPTION} as template`}>Save as template</Link>
+                  </TableCell>}
                 </TableRow>
               );
             })

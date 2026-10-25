@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import {
   DollarSign,
   PlusCircle,
+  Repeat,
   History,
   BarChart3,
   PieChart,
@@ -49,6 +50,7 @@ const navItems = [
     href: "/add-transaction",
     icon: PlusCircle,
   },
+  { title: "Recurring Transactions", href: "/recurring-transactions", icon: Repeat },
   {
     title: "Display Transaction History",
     href: "/history",

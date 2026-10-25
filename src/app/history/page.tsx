@@ -169,7 +169,7 @@ export default function HistoryPage() {
             </Card>
           </div>
 
-          <TransactionTable transactions={result.transactions} />
+          <TransactionTable transactions={result.transactions} showTemplateLinks />
         </div>
       )}
     </div>

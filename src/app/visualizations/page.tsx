@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useVisualizationData } from "@/hooks/use-visualization-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,13 +31,6 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-
-interface DataRow {
-  TRAN_TYPE: string;
-  MONTH: string;
-  TOTAL_DEBIT: number;
-  TOTAL_CREDIT: number;
-}
 
 const COLORS = [
   "#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed",
@@ -172,8 +166,7 @@ export default function VisualizationsPage() {
   const [topTypes, setTopTypes] = useState<string[]>([]);
   const [restTypes, setRestTypes] = useState<string[]>([]);
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
-  const [data, setData] = useState<DataRow[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data, loading, error } = useVisualizationData(startDate, endDate, selectedTypes);
   const [chartView, setChartView] = useState<ChartView>("bar");
   const [typeSearch, setTypeSearch] = useState("");
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -205,22 +198,6 @@ export default function VisualizationsPage() {
         }
       });
   }, []);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    const params = new URLSearchParams({ startDate, endDate });
-    if (selectedTypes.size > 0) {
-      params.set("tranTypes", Array.from(selectedTypes).join(","));
-    }
-    const res = await fetch(`/api/transactions/visualization?${params}`);
-    const json = await res.json();
-    setData(json.data || []);
-    setLoading(false);
-  }, [startDate, endDate, selectedTypes]);
-
-  useEffect(() => {
-    if (startDate && endDate) fetchData();
-  }, [fetchData, startDate, endDate]);
 
   function toggleType(type: string) {
     setSelectedTypes((prev) => {
@@ -456,6 +433,8 @@ export default function VisualizationsPage() {
           {/* Charts */}
           {loading ? (
             <p className="text-muted-foreground">Loading data...</p>
+          ) : error ? (
+            <p role="alert" className="py-12 text-center text-destructive">{error}</p>
           ) : data.length === 0 ? (
             <p className="text-muted-foreground">
               No data found for the selected filters.

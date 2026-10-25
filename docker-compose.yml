@@ -12,5 +12,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./migrations/001-recurring-transactions.sql:/docker-entrypoint-initdb.d/recurring.sql
 volumes:
   postgres_data:
