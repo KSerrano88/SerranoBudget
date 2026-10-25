@@ -1,5 +1,12 @@
 # Serrano Budget-inator — Agent Context
 
+## Transaction operations
+
+Before adding or changing transactions or recurring templates, read
+[docs/transaction-operations.md](docs/transaction-operations.md).
+Use [README.md](README.md) for the current module and API reference.
+
+
 Personal budgeting web app. Originally a PHP LAMP-stack application (~2011), fully rewritten as a modern Next.js app deployed on Vercel with Neon PostgreSQL.
 
 ## Tech Stack
