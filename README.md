@@ -7,6 +7,7 @@ and posted balances. The app uses Next.js, PostgreSQL, and shadcn/ui.
 
 - Balance sheet with a configurable date range and all, posted, or unposted filters.
 - Transaction entry with ranked transaction types and support for new types.
+- [Recurring transactions](#recurring-transactions) with saved templates, batch review, duplicate warnings, and temporary highlights for new rows.
 - Inline editing and bulk deletion of selected transactions.
 - Bulk saves that commit all rows or roll back all changes.
 - Transaction history with date, exact type, and partial type filters.
@@ -98,12 +99,15 @@ Next.js loads `.env.local`. Environment files are excluded from Git, except for
 
 ### Database initialization
 
-On the first start with an empty data volume, PostgreSQL runs [init.sql](init.sql).
-It creates the schema, adds a carryover balance, and loads sample transactions
+On the first start with an empty data volume, PostgreSQL runs [init.sql](init.sql)
+and [the recurring transaction migration](migrations/001-recurring-transactions.sql).
+These scripts create the schema, add a carryover balance, and load sample transactions
 from October 2025 through February 2026. A recent date filter may show no sample
 rows. Increase **Prior Days** or select **Unposted** to view them.
 
-The initialization script does not run again when you restart an existing volume.
+The initialization scripts do not run again when you restart an existing volume.
+Run `npm run db:migrate` after configuring `.env.local` to add recurring transaction
+tables to an existing database.
 Changing `.env.local` also does not change the PostgreSQL user or password stored
 in that volume. `docker compose down` stops the database and preserves its data.
 
@@ -175,10 +179,15 @@ does not yet cover `/api/transactions/balance-sheet`.
 
 ## Data and read behavior
 
-The schema has two tables:
+The schema has four tables:
 
 - `transactions`: dates, descriptions, notes, types, debit and credit amounts, and posted flags.
 - `balance_carryover`: starting balances. The app expects one active row with `IS_ACTIVE = 1`.
+- `recurring_templates`: saved defaults for recurring income and expenses.
+- `recurring_batches`: saved request details and inserted row IDs. Retrying a saved request returns the same result without adding rows again.
+
+`transactions.RECURRING_TEMPLATE_ID` links generated transactions to their templates.
+Deleting a template clears this link and preserves the transactions.
 
 The balance sheet loads rows and all totals through one request to
 `/api/transactions/balance-sheet`. One SQL statement reads them from one database
@@ -216,9 +225,16 @@ Valid posted states are `all`, `posted`, and `unposted`; valid days are 0–3650
 | GET | `/api/transactions/history` | Rows and range totals; requires `startDate` and `endDate`. Optional filters: `tranType`, `tranTypeContains`. |
 | GET | `/api/transactions/monthly-totals` | Monthly debit and credit totals by type. |
 | GET | `/api/transactions/visualization` | Chart data; requires `startDate` and `endDate`. Optional filter: comma-separated `tranTypes`. |
+| GET | `/api/transactions/bulk?ids=1,2` | Read selected rows for separate template review. |
 | PUT | `/api/transactions/bulk` | Save a body of `{ transactions: [{ id, ...fields }] }` as one database transaction. |
 | DELETE | `/api/transactions/bulk` | Delete a body of `{ ids: [...] }`. |
 | DELETE | `/api/transactions/last` | Delete the transaction with the highest ID. |
+| GET | `/api/recurring-transactions/templates` | List saved templates. |
+| POST | `/api/recurring-transactions/templates` | Create a template. |
+| PUT | `/api/recurring-transactions/templates/[id]` | Update template defaults. |
+| DELETE | `/api/recurring-transactions/templates/[id]` | Delete a template and preserve existing transactions. |
+| POST | `/api/recurring-transactions/check` | Check for existing transactions from the same template in each reviewed month. |
+| POST | `/api/recurring-transactions` | Add the reviewed group atomically. Return the count and inserted row IDs. |
 
 ## Project structure
 
@@ -230,21 +246,27 @@ src/
 │   ├── login/page.tsx              # Single-user sign-in
 │   ├── balance-sheet/page.tsx      # Balance sheet and inline editing
 │   ├── add-transaction/page.tsx    # Transaction entry
+│   ├── recurring-transactions/page.tsx # Template management and batch review
 │   ├── history/page.tsx            # Filtered transaction history
 │   ├── monthly-totals/page.tsx     # Monthly totals
 │   ├── visualizations/page.tsx     # Bar, line, and pie charts
 │   └── api/
 │       ├── auth/[...nextauth]/     # Authentication handlers
+│       ├── recurring-transactions/ # Templates, duplicate checks, batch creation
 │       └── transactions/           # Transaction routes
 ├── components/                    # Navigation, tables, forms, summary display
 │   └── ui/                         # shadcn/ui controls, including alert-dialog
 ├── hooks/
 │   ├── use-balance-sheet.ts        # One-request loading, cancellation, retry
+│   ├── use-visualization-data.ts   # Chart loading and request cancellation
 │   └── use-mobile.ts               # Mobile layout detection
 ├── lib/
 │   ├── auth.ts                     # Authentication configuration
 │   ├── balance-sheet-input.ts     # Shared read filters
 │   ├── transaction-input.ts       # Shared write validation and inferred types
+│   ├── recurring-input.ts         # Template and batch validation, date rules
+│   ├── recurring-draft.ts         # Editable template and transaction defaults
+│   ├── added-transactions.ts      # Count, inserted IDs, and return date range
 │   ├── db.ts                       # Connection pool and column-name conversion
 │   ├── queries.ts                  # Parameterized SQL, bulk saves, balance reads
 │   ├── rate-limit.ts              # In-memory login attempt limits
@@ -254,8 +276,10 @@ src/
 │   └── utils.ts                    # CSS class helpers
 └── middleware.ts                  # Session checks for pages and transaction routes
 
+migrations/                        # Additive database schema migrations
+scripts/migrate.mjs                # Transactional recurring schema migration
 tests/                             # Automated tests, including browser loading tests
-└── integration/                   # PostgreSQL bulk save and balance sheet tests
+└── integration/                   # PostgreSQL balance, bulk save, and recurring tests
 ```
 
 ## Deployment
@@ -288,8 +312,8 @@ amount, notes, day of the month, and default posted status.
 New templates default to unposted. Leave the amount empty for a variable bill.
 
 Select templates and a month, then select **Add Selected Transactions**.
-The month defaults to the current local month. A saved day that does not exist uses the last day of
-that month. During review, you can change each field. Changing the group month
+The month defaults to the current local month. A saved day that does not exist
+uses the last day of that month. During review, you can change each field. Changing the group month
 resets dates to the saved days. Review changes do not update templates. Amounts
 are required during review. Check numbers and multi-part totals start empty.
 
