@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Transaction } from "@/lib/types";
 import { formatCurrency, formatDate, toInputDate } from "@/lib/format";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,13 +66,14 @@ export function TransactionTable({
             <TableHead className={hideOnMobile}>Type</TableHead>
             <TableHead className="text-right">Debit</TableHead>
             <TableHead className="text-right">Credit</TableHead>
+            {!editable && <TableHead>Template</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {transactions.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={selectable ? 10 : 9}
+                colSpan={(selectable ? 10 : 9) + (editable ? 0 : 1)}
                 className="text-center text-muted-foreground py-8"
               >
                 No transactions found
@@ -281,6 +283,11 @@ export function TransactionTable({
                       ""
                     )}
                   </TableCell>
+                  {!editable && <TableCell>
+                    <Link className="inline-flex min-h-11 items-center whitespace-nowrap text-sm underline underline-offset-4"
+                      href={`/recurring-transactions?from=${t.ID_TRANSACTIONS}`}
+                      aria-label={`Save ${t.DESCRIPTION} as template`}>Save as template</Link>
+                  </TableCell>}
                 </TableRow>
               );
             })

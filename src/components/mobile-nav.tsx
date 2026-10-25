@@ -2,11 +2,12 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { DollarSign, PlusCircle, History, BarChart3, PieChart } from "lucide-react";
+import { DollarSign, PlusCircle, Repeat, History, BarChart3, PieChart } from "lucide-react";
 
 const navItems = [
   { title: "Balance", href: "/balance-sheet", icon: DollarSign },
   { title: "Add Transaction", href: "/add-transaction", icon: PlusCircle },
+  { title: "Recurring", href: "/recurring-transactions", icon: Repeat },
   { title: "History", href: "/history", icon: History },
   { title: "Totals", href: "/monthly-totals", icon: BarChart3 },
   { title: "Charts", href: "/visualizations", icon: PieChart },
@@ -32,7 +33,7 @@ export function MobileNav() {
           </div>
         </div>
       </div>
-      <div className="flex">
+      <div className="grid grid-cols-3 min-[480px]:grid-cols-6">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (

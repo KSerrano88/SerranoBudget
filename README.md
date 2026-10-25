@@ -122,6 +122,7 @@ with a disposable development database.
 | `npx tsc --noEmit` | Check TypeScript without building the app. |
 | `npm test` | Run the automated tests once. |
 | `npm run test:watch` | Run Vitest in watch mode. |
+| `npm run db:migrate` | Add the recurring transaction schema to the configured database. |
 
 The build uses `next/font/google` to load Inter. It needs access to Google Fonts
 when those font files are not cached.
@@ -264,14 +265,40 @@ app environment variables in Vercel. Use a production `DATABASE_URL`, a random
 session secret, and your app login credentials. `TEST_DATABASE_URL` is only for
 tests. `NEXTAUTH_URL` is not required on Vercel.
 
-Create the two database tables before using a new production database. There is
-no automatic migration command in this repository. [init.sql](init.sql) contains
-the schema and sample inserts; use the schema definitions without the sample
-inserts when you prepare a production database. Add one active carryover row
-with your actual starting balance.
+Create the base tables before using a new production database. [init.sql](init.sql)
+contains the schema and sample inserts. Use the schema definitions without the
+sample inserts for production. Add one active carryover row with your starting
+balance. Then run `npm run db:migrate` against that database before deploying
+this version. The command uses `DATABASE_URL` from the environment or local
+Next.js environment files. It adds the recurring transaction tables and link
+column without changing existing transaction values. It is safe to run again.
+Fresh Compose databases also run this migration during initialization.
 
 Login attempt limits are stored in process memory. They are not shared across
 Vercel instances and reset when an instance restarts.
+
+## Recurring transactions
+
+Open **Recurring Transactions** in the navigation. Create a template there, or
+select **Save as template** beside an existing transaction on the Balance Sheet
+or History page. Templates support income and expenses. They store the
+description, category, amount, notes, day of the month, and default posted status.
+New templates default to unposted. Leave the amount empty for a variable bill.
+
+Select templates and a month, then select **Review selected**. The month defaults
+to the current local month. A saved day that does not exist uses the last day of
+that month. During review, you can change each field. Changing the group month
+resets dates to the saved days. Review changes do not update templates. Amounts
+are required during review. Check numbers and multi-part totals start empty.
+
+The app warns when an existing transaction from the same template falls in a
+reviewed month. Accept the warning to add another. The app adds the whole group
+or none. Failed requests keep your review changes. Retrying the same saved
+request does not add the group again. After success, the app opens the Balance
+Sheet and shows the number added.
+
+Edit templates separately to change future defaults. Template deletion requires
+confirmation and preserves existing transactions. There is no automatic schedule.
 
 ## Maintainer
 

@@ -2,6 +2,8 @@ import pool, { query } from "./db";
 import type { BalanceSheetFilters } from "./balance-sheet-input";
 import type { BalanceSheetData } from "./types";
 import type { BulkTransaction, ValidatedTransaction } from "./transaction-input";
+import type { PoolClient } from "pg";
+import type { TemplateInput, RecurringTemplate, RecurringBatch, RecurringCheck, RecurringDuplicate } from "./recurring-input";
 
 // ===== BALANCE SHEET QUERIES =====
 
@@ -351,4 +353,114 @@ export async function getVisualizationData(params: {
     TOTAL_DEBIT: number;
     TOTAL_CREDIT: number;
   }>;
+}
+
+// ===== RECURRING TRANSACTIONS =====
+
+export async function getRecurringTemplates() {
+  const { rows } = await query<RecurringTemplate>(
+    "SELECT * FROM recurring_templates ORDER BY DESCRIPTION, ID_TEMPLATE"
+  );
+  return rows;
+}
+
+function templateParams(t: TemplateInput) {
+  return [t.DESCRIPTION, t.TRAN_TYPE, t.DIRECTION, t.AMOUNT, t.NOTES, t.DAY_OF_MONTH, t.POSTED_FLAG];
+}
+
+export async function createRecurringTemplate(t: TemplateInput) {
+  const { rows } = await query<RecurringTemplate>(`INSERT INTO recurring_templates
+    (DESCRIPTION, TRAN_TYPE, DIRECTION, AMOUNT, NOTES, DAY_OF_MONTH, POSTED_FLAG)
+    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`, templateParams(t));
+  return rows[0];
+}
+
+export async function updateRecurringTemplate(id: number, t: TemplateInput): Promise<RecurringTemplate | null> {
+  const { rows } = await query<RecurringTemplate>(`UPDATE recurring_templates SET
+    DESCRIPTION = $1, TRAN_TYPE = $2, DIRECTION = $3, AMOUNT = $4,
+    NOTES = $5, DAY_OF_MONTH = $6, POSTED_FLAG = $7
+    WHERE ID_TEMPLATE = $8 RETURNING *`, [...templateParams(t), id]);
+  return rows[0] ?? null;
+}
+
+export async function deleteRecurringTemplate(id: number) {
+  const result = await query("DELETE FROM recurring_templates WHERE ID_TEMPLATE = $1", [id]);
+  return result.rowCount === 1;
+}
+
+export async function getRecurringDuplicates(transactions: RecurringCheck, client: PoolClient | typeof pool = pool): Promise<RecurringDuplicate[]> {
+  const { rows } = await client.query(`SELECT DISTINCT
+      t.RECURRING_TEMPLATE_ID AS template_id,
+      TO_CHAR(t.TRANSACTION_DATE, 'YYYY-MM') AS month
+    FROM transactions t
+    JOIN jsonb_to_recordset($1::jsonb) AS r(template_id integer, date date)
+      ON t.RECURRING_TEMPLATE_ID = r.template_id
+      AND t.TRANSACTION_DATE >= DATE_TRUNC('month', r.date)
+      AND t.TRANSACTION_DATE < DATE_TRUNC('month', r.date) + INTERVAL '1 month'
+    ORDER BY template_id, month`, [JSON.stringify(transactions.map(t => ({
+      template_id: t.TEMPLATE_ID, date: t.TRANSACTION_DATE,
+    })))]);
+  return rows.map(row => ({ templateId: row.template_id, month: row.month }));
+}
+
+export class RecurringDuplicateError extends Error {
+  constructor(readonly duplicates: RecurringDuplicate[]) {
+    super("Review the duplicate warning before adding this group.");
+  }
+}
+
+export class RecurringTemplateMissingError extends Error {
+  constructor() { super("A selected template was deleted. Return to the template list and select it again."); }
+}
+
+export class RecurringRequestConflictError extends Error {
+  constructor() { super("This request was already saved with different values. Start a new group."); }
+}
+
+export async function createRecurringTransactions(batch: RecurringBatch) {
+  const client = await pool.connect();
+  let discardClient = false;
+  const payload = JSON.stringify(batch.transactions);
+  try {
+    await client.query("BEGIN");
+    const inserted = await client.query(`INSERT INTO recurring_batches
+      (REQUEST_ID, PAYLOAD, TRANSACTION_COUNT) VALUES ($1, $2::jsonb, $3)
+      ON CONFLICT (REQUEST_ID) DO NOTHING RETURNING TRANSACTION_COUNT`,
+    [batch.requestId, payload, batch.transactions.length]);
+    if (!inserted.rowCount) {
+      const { rows } = await client.query(`SELECT TRANSACTION_COUNT, PAYLOAD = $2::jsonb AS matches
+        FROM recurring_batches WHERE REQUEST_ID = $1`, [batch.requestId, payload]);
+      if (!rows[0]?.matches) throw new RecurringRequestConflictError();
+      await client.query("COMMIT");
+      return rows[0].transaction_count as number;
+    }
+
+    // Serialize groups that use the same templates before checking for duplicates.
+    const ids = [...new Set(batch.transactions.map(t => t.TEMPLATE_ID))].sort((a, b) => a - b);
+    const locked = await client.query(`SELECT ID_TEMPLATE FROM recurring_templates
+      WHERE ID_TEMPLATE = ANY($1::integer[]) ORDER BY ID_TEMPLATE FOR UPDATE`, [ids]);
+    if (locked.rowCount !== ids.length) throw new RecurringTemplateMissingError();
+    const duplicates = await getRecurringDuplicates(batch.transactions, client);
+    if (duplicates.length && !batch.allowDuplicates) throw new RecurringDuplicateError(duplicates);
+
+    await client.query(`INSERT INTO transactions
+      (TRANSACTION_DATE, CHECK_NMBR, DESCRIPTION, NOTES, MULTI_PART_TRAN_TOTAL,
+       POSTED_FLAG, TRAN_TYPE, DEBIT, CREDIT, RECURRING_TEMPLATE_ID)
+      SELECT "TRANSACTION_DATE", "CHECK_NMBR", "DESCRIPTION", "NOTES", "MULTI_PART_TRAN_TOTAL",
+        "POSTED_FLAG", "TRAN_TYPE",
+        CASE WHEN "DIRECTION" = 'debit' THEN "AMOUNT" ELSE 0 END,
+        CASE WHEN "DIRECTION" = 'credit' THEN "AMOUNT" ELSE 0 END, "TEMPLATE_ID"
+      FROM jsonb_to_recordset($1::jsonb) AS r(
+        "TRANSACTION_DATE" date, "CHECK_NMBR" text, "DESCRIPTION" text, "NOTES" text,
+        "MULTI_PART_TRAN_TOTAL" numeric, "POSTED_FLAG" smallint, "TRAN_TYPE" text,
+        "DIRECTION" text, "AMOUNT" numeric, "TEMPLATE_ID" integer)`, [payload]);
+    await client.query("COMMIT");
+    return batch.transactions.length;
+  } catch (error) {
+    try { await client.query("ROLLBACK"); }
+    catch { discardClient = true; }
+    throw error;
+  } finally {
+    client.release(discardClient);
+  }
 }

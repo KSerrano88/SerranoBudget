@@ -19,7 +19,7 @@ function uppercaseKeys<T extends QueryResultRow>(row: T): T {
 /** Query wrapper that returns rows with uppercase column names */
 export async function query<T extends QueryResultRow = QueryResultRow>(
   sql: string,
-  params?: (string | number)[]
+  params?: (string | number | null)[]
 ) {
   const result = await pool.query<T>(sql, params);
   return {
