@@ -25,7 +25,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = process.env.APP_PASSWORD;
 
         if (
-          credentials?.username === username &&
+          username &&
+          password &&
+          typeof credentials?.username === "string" &&
+          typeof credentials?.password === "string" &&
+          credentials.username === username &&
           credentials?.password === password
         ) {
           clearAttempts(ip);
